@@ -1,0 +1,89 @@
+id: "speed_miner"
+display-name: "&7Speed Miner"
+description: "Mine the most ores in the time limit!"
+icon-material: IRON_PICKAXE
+bar-color: WHITE
+bar-style: SOLID
+
+type: MINING
+scoring-mode: SUM
+score-formula: "1"
+target-score: 0
+
+farming-actions: []
+mining-materials:
+  - COAL_ORE
+  - DEEPSLATE_COAL_ORE
+  - IRON_ORE
+  - DEEPSLATE_IRON_ORE
+  - GOLD_ORE
+  - DEEPSLATE_GOLD_ORE
+  - DIAMOND_ORE
+  - DEEPSLATE_DIAMOND_ORE
+  - EMERALD_ORE
+  - DEEPSLATE_EMERALD_ORE
+  - LAPIS_ORE
+  - DEEPSLATE_LAPIS_ORE
+  - REDSTONE_ORE
+  - DEEPSLATE_REDSTONE_ORE
+  - COPPER_ORE
+  - DEEPSLATE_COPPER_ORE
+  - NETHER_QUARTZ_ORE
+  - NETHER_GOLD_ORE
+  - ANCIENT_DEBRIS
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 320
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: THURSDAY
+      time: "17:00"
+      duration: 30
+  in-rotation: true
+  rotation-weight: 10
+
+messages:
+  start: "&6★ Tournament &eSpeed Miner&6 has begun! Duration: &e{duration}m"
+  end: "&6★ Speed Miner ended! Top miner: &e{winner} &7({score} ores)"
+  warning: "&6★ A &eSpeed Miner&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 3500.0
+    commands:
+      - "eco give {player} 350"
+    items:
+      - material: NETHERITE_PICKAXE
+        amount: 1
+        display-name: "&7Master Miner's Pick"
+  2:
+    money: 1750.0
+    commands: []
+    items: []
+  3:
+    money: 875.0
+    commands: []
+    items: []
+  0:
+    enabled: true
+    commands:
+      - "eco give {player} 20"
+
+integration:
+  defer-to-swagfishing: false
+  defer-to-swagfarming: false
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE

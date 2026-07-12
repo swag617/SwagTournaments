@@ -1,0 +1,53 @@
+prefix: "&8[&6Tournaments&8] &r"
+
+tournament:
+  start: "&6★ &eTournament &6{name} &ehas begun! &7Duration: &e{duration}m"
+  end: "&6★ &eTournament &6{name} &ehas ended!"
+  end-winner: "&6★ &eWinner: &a{winner} &7with &e{score} &7points!"
+  end-no-participants: "&6★ &eTournament ended with no participants."
+  warning: "&6★ &eA &6{name} &etournament begins in &6{time}&e!"
+  already-active: "&cA tournament of type &e{type} &cis already active."
+  not-active: "&cThere is no active tournament."
+  blocked-by-swagfishing: "&cCannot start a FISHING tournament while SwagFishing tournament is active."
+  started-by: "&7Tournament started by &e{sender}&7."
+  stopped-by: "&7Tournament stopped by &e{sender}&7."
+  no-permission: "&cYou don't have permission to do that."
+  unknown-template: "&cUnknown template: &e{id}&c. Use /ta list to see available templates."
+  no-templates: "&cNo tournament templates are loaded."
+
+leaderboard:
+  header: "&6--- &eTournament: &6{name} &e---"
+  entry: "&7{rank}. &e{player} &7— &6{score}"
+  no-entries: "&7No participants yet."
+  your-rank: "&7Your rank: &e{rank} &7| Score: &e{score}"
+
+rewards:
+  give-money: "&aYou received &e${amount} &afor placing &e{place} &ain the tournament!"
+  give-item: "&aYou received a reward item for placing &e{place}&a!"
+  participation: "&aYou received a participation reward!"
+
+stats:
+  header: "&6--- &eStats for &6{player} &e---"
+  tournaments-entered: "&7Entered: &e{value}"
+  tournaments-won: "&7Won: &e{value}"
+  placements: "&7Placements: &e1st x{first} &72nd x{second} &73rd x{third}"
+  best-score: "&7Best score ever: &e{value}"
+  no-stats: "&cNo tournament stats found for &e{player}&c."
+
+history:
+  header: "&6--- &ePast Tournaments (Page {page}) &e---"
+  entry: "&7#{id} &e{template} &7— {date} &7| Winner: &e{winner} &7({score})"
+  no-history: "&7No tournament history yet."
+
+next:
+  header: "&6--- &eUpcoming Tournaments &e---"
+  entry: "&7{template} &e— {day} at {time} &7({duration}m)"
+  none: "&7No scheduled tournaments found."
+
+admin:
+  reload-all: "&aAll tournament templates reloaded."
+  reload-one: "&aTemplate &e{id} &areloaded."
+  score-added: "&aAdded &e{amount} &ato &e{player}&a's tournament score."
+  score-not-custom: "&cScore command is only for CUSTOM type tournaments."
+  list-header: "&6--- &eLoaded Templates &e---"
+  list-entry: "&7- &e{id} &7({type}, {mode})"

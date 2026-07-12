@@ -1,0 +1,70 @@
+id: "most_fish"
+display-name: "&6Most Fish Caught"
+description: "Catch as many fish as possible!"
+icon-material: COD
+bar-color: BLUE
+bar-style: SOLID
+
+type: FISHING
+scoring-mode: SUM
+score-formula: "1"
+target-score: 0
+
+farming-actions: []
+mining-materials: []
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 320
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: SATURDAY
+      time: "18:00"
+      duration: 60
+  in-rotation: true
+  rotation-weight: 10
+
+messages:
+  start: "&6★ Tournament &eMost Fish Caught&6 has begun! Duration: &e{duration}m"
+  end: "&6★ Tournament ended! Winner: &e{winner} &7({score} fish)"
+  warning: "&6★ A &eMost Fish Caught&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 5000.0
+    commands:
+      - "eco give {player} 500"
+    items:
+      - material: DIAMOND
+        amount: 3
+        display-name: "&bFirst Place Diamond"
+  2:
+    money: 2500.0
+    commands: []
+    items: []
+  3:
+    money: 1000.0
+    commands: []
+    items: []
+  0:
+    enabled: true
+    commands:
+      - "eco give {player} 50"
+
+integration:
+  defer-to-swagfishing: true
+  defer-to-swagfarming: false
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE

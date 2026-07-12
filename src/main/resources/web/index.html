@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwagTournaments Admin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Main App -->
+<div id="app">
+
+    <header>
+        <div>
+            <h1>SwagTournaments</h1>
+            <div class="version">Admin Panel</div>
+        </div>
+        <nav>
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="templates">Templates</button>
+            <button class="tab-btn" data-tab="schedule">Schedule</button>
+            <button class="tab-btn" data-tab="history">History</button>
+            <button class="tab-btn" data-tab="config">Config</button>
+            <span id="whoami" class="text-muted" style="font-size:.8rem;margin-right:8px;"></span>
+            <a href="/logout" class="btn btn-secondary btn-sm">Logout</a>
+        </nav>
+    </header>
+
+    <main>
+
+        <!-- Dashboard Tab -->
+        <section id="tab-dashboard" class="active">
+            <div class="section-header">
+                <h2>Dashboard</h2>
+            </div>
+            <div id="dashboard-content">
+                <p class="no-data">Loading...</p>
+            </div>
+        </section>
+
+        <!-- Templates Tab -->
+        <section id="tab-templates">
+            <div class="section-header">
+                <h2>Tournament Templates</h2>
+                <button class="btn btn-primary btn-sm" onclick="openTemplateEditor(null)">+ New Template</button>
+            </div>
+            <div class="card-grid" id="templates-grid">
+                <p class="no-data">Loading...</p>
+            </div>
+        </section>
+
+        <!-- Schedule Tab -->
+        <section id="tab-schedule">
+            <div class="section-header">
+                <h2>Schedule</h2>
+            </div>
+            <div class="card">
+                <h2>Cron Slots</h2>
+                <div id="schedule-next" class="text-muted" style="font-size:.85rem;margin-bottom:12px;"></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Template ID</th>
+                            <th>Name</th>
+                            <th>Day</th>
+                            <th>Time / Duration</th>
+                            <th>Next Fire</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-slots"></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h2>Auto-Rotation</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-enabled"> Enabled
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Interval (minutes)</label>
+                        <input type="number" id="auto-interval" min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Duration (minutes)</label>
+                        <input type="number" id="auto-duration" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Players</label>
+                        <input type="number" id="auto-min-players" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Warning (minutes before)</label>
+                        <input type="number" id="auto-warning" min="0">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="saveSchedule()">Save Auto-Schedule</button>
+            </div>
+        </section>
+
+        <!-- History Tab -->
+        <section id="tab-history">
+            <div class="section-header">
+                <h2>Tournament History</h2>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Template</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Participants</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody"></tbody>
+                </table>
+                <div class="flex-gap mt-4">
+                    <button class="btn btn-secondary btn-sm" id="hist-prev" onclick="loadHistory(historyPage - 1)">Previous</button>
+                    <button class="btn btn-secondary btn-sm" id="hist-next" onclick="loadHistory(historyPage + 1)">Next</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Config Tab -->
+        <section id="tab-config">
+            <div class="section-header">
+                <h2>Plugin Config</h2>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+                <h2>Active Integrations</h2>
+                <div class="integration-grid" id="integrations-pills"></div>
+            </div>
+            <div class="card">
+                <h2>Configuration Keys</h2>
+                <div id="config-form"></div>
+                <button class="btn btn-primary mt-4" onclick="saveConfig()">Save Config</button>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<!-- Start Tournament Modal -->
+<div id="start-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Start Tournament</h2>
+            <button class="modal-close" onclick="closeModal('start-modal')">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>Template</label>
+            <select id="start-template-id"></select>
+        </div>
+        <div class="form-group">
+            <label>Duration (minutes)</label>
+            <input type="number" id="start-duration" value="30" min="1">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('start-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmStartTournament()">Start</button>
+        </div>
+    </div>
+</div>
+
+<!-- Template Editor Modal -->
+<div id="template-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="tmpl-modal-title">New Template</h2>
+            <button class="modal-close" onclick="closeModal('template-modal')">&times;</button>
+        </div>
+        <input type="hidden" id="tmpl-editing-id">
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Template ID (no spaces)</label>
+                <input type="text" id="tmpl-id" placeholder="e.g. most_fish">
+            </div>
+            <div class="form-group">
+                <label>Display Name</label>
+                <input type="text" id="tmpl-display-name" placeholder="Most Fish Caught">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="tmpl-description">
+        </div>
+        <div class="form-row-3">
+            <div class="form-group">
+                <label>Type</label>
+                <select id="tmpl-type">
+                    <option value="FISHING">FISHING</option>
+                    <option value="FARMING">FARMING</option>
+                    <option value="COMBAT">COMBAT</option>
+                    <option value="MINING">MINING</option>
+                    <option value="ECONOMY">ECONOMY</option>
+                    <option value="CUSTOM">CUSTOM</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Scoring Mode</label>
+                <select id="tmpl-scoring-mode">
+                    <option value="SUM">SUM</option>
+                    <option value="MAX">MAX</option>
+                    <option value="UNIQUE_COUNT">UNIQUE_COUNT</option>
+                    <option value="FIRST_TO">FIRST_TO</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Score Formula</label>
+                <input type="text" id="tmpl-score-formula" value="1">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Target Score (FIRST_TO only, 0=off)</label>
+                <input type="number" id="tmpl-target-score" value="0">
+            </div>
+            <div class="form-group">
+                <label>Icon Material</label>
+                <input type="text" id="tmpl-icon-material" value="PAPER">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Bar Color</label>
+                <select id="tmpl-bar-color">
+                    <option value="WHITE">WHITE</option>
+                    <option value="BLUE">BLUE</option>
+                    <option value="GREEN">GREEN</option>
+                    <option value="RED">RED</option>
+                    <option value="YELLOW">YELLOW</option>
+                    <option value="PURPLE">PURPLE</option>
+                    <option value="PINK">PINK</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+        <div class="form-row">
+            <div class="form-group">
+                <label><input type="checkbox" id="tmpl-in-rotation"> In Auto-Rotation Pool</label>
+            </div>
+            <div class="form-group">
+                <label>Rotation Weight</label>
+                <input type="number" id="tmpl-rotation-weight" value="1" min="1">
+            </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px;">Messages (use &amp; color codes)</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Message</label>
+                <input type="text" id="tmpl-msg-start">
+            </div>
+            <div class="form-group">
+                <label>End Message</label>
+                <input type="text" id="tmpl-msg-end">
+            </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px;">Rewards — commands use {player} placeholder, one per line</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>1st Place Money</label>
+                <input type="number" id="tmpl-reward-1-money" value="0">
+            </div>
+            <div class="form-group">
+                <label>1st Place Commands</label>
+                <textarea id="tmpl-reward-1-cmds" rows="2"></textarea>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>2nd Place Money</label>
+                <input type="number" id="tmpl-reward-2-money" value="0">
+            </div>
+            <div class="form-group">
+                <label>2nd Place Commands</label>
+                <textarea id="tmpl-reward-2-cmds" rows="2"></textarea>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>3rd Place Money</label>
+                <input type="number" id="tmpl-reward-3-money" value="0">
+            </div>
+            <div class="form-group">
+                <label>3rd Place Commands</label>
+                <textarea id="tmpl-reward-3-cmds" rows="2"></textarea>
+            </div>
+        </div>
+        <div class="form-group">
+            <label><input type="checkbox" id="tmpl-reward-p-enabled"> Participation Reward</label>
+            <textarea id="tmpl-reward-p-cmds" rows="2" placeholder="Commands for all participants"></textarea>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+        <div class="form-row">
+            <div class="form-group">
+                <label><input type="checkbox" id="tmpl-start-fireworks"> Start Fireworks</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="tmpl-end-fireworks"> End Fireworks</label>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Sound</label>
+                <input type="text" id="tmpl-sound-start" placeholder="ENTITY_PLAYER_LEVELUP">
+            </div>
+            <div class="form-group">
+                <label>End Sound</label>
+                <input type="text" id="tmpl-sound-end" placeholder="UI_TOAST_CHALLENGE_COMPLETE">
+            </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+        <div class="form-row">
+            <div class="form-group">
+                <label><input type="checkbox" id="tmpl-defer-fishing"> Defer to SwagFishing</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="tmpl-defer-farming"> Defer to SwagFarming</label>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-danger btn-sm" id="btn-delete-template" onclick="deleteTemplate()">Delete</button>
+            <button class="btn btn-secondary" onclick="closeModal('template-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+name: SwagTournaments
+version: '${project.version}'
+main: com.swag.tournaments.SwagTournaments
+api-version: '1.21'
+author: swag617
+description: Flexible tournaments plugin with web editor
+
+softdepend:
+  - SwagAPI
+  - SwagFishing
+  - SwagFarming
+  - DiscordUtils
+  - Vault
+  - PlaceholderAPI
+
+commands:
+  tournament:
+    description: Player tournament commands
+    usage: /<command> [info|top|history|stats|next]
+    aliases: [t, tourney]
+    permission: swagtournaments.use
+  tournamentadmin:
+    description: Admin tournament commands
+    usage: /<command> [start|stop|reload|list|score|webtrust]
+    aliases: [ta, tadmin]
+    permission: swagtournaments.admin
+
+permissions:
+  swagtournaments.use:
+    description: Access player tournament commands and GUI
+    default: true
+  swagtournaments.admin:
+    description: Access admin tournament commands
+    default: op

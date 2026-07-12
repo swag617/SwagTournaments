@@ -1,0 +1,31 @@
+web-editor:
+  enabled: true
+
+discord:
+  enabled: true
+  announcements-server: 1
+  announcements-channel-id: ""
+  live-updates-enabled: false
+  live-updates-interval-minutes: 15
+  colors:
+    FISHING: "#3399FF"
+    FARMING: "#44BB44"
+    COMBAT: "#FF4444"
+    MINING: "#AAAAAA"
+    ECONOMY: "#FFDD00"
+    CUSTOM: "#AA44AA"
+
+auto-schedule:
+  enabled: false
+  interval-minutes: 180
+  duration-minutes: 30
+  min-players: 2
+  warning-minutes: 5
+
+integrations:
+  swag-fishing:
+    enabled: true
+  swag-farming:
+    enabled: true
+  discord-utils:
+    enabled: true

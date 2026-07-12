@@ -1,0 +1,71 @@
+id: "crop_harvest"
+display-name: "&aHarvest Festival"
+description: "Harvest as many crops as possible!"
+icon-material: WHEAT
+bar-color: GREEN
+bar-style: SOLID
+
+type: FARMING
+scoring-mode: SUM
+score-formula: "1"
+target-score: 0
+
+farming-actions:
+  - HARVEST
+mining-materials: []
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 320
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: WEDNESDAY
+      time: "20:00"
+      duration: 30
+  in-rotation: true
+  rotation-weight: 9
+
+messages:
+  start: "&6★ Tournament &eHarvest Festival&6 has begun! Duration: &e{duration}m"
+  end: "&6★ Harvest Festival ended! Top harvester: &e{winner} &7({score} crops)"
+  warning: "&6★ A &eHarvest Festival&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 3000.0
+    commands:
+      - "eco give {player} 300"
+    items:
+      - material: EMERALD
+        amount: 5
+        display-name: "&aHarvest Champion"
+  2:
+    money: 1500.0
+    commands: []
+    items: []
+  3:
+    money: 750.0
+    commands: []
+    items: []
+  0:
+    enabled: true
+    commands:
+      - "eco give {player} 25"
+
+integration:
+  defer-to-swagfishing: false
+  defer-to-swagfarming: true
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE

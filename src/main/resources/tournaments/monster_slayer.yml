@@ -1,0 +1,70 @@
+id: "monster_slayer"
+display-name: "&cMonster Slayer"
+description: "Kill as many monsters as possible!"
+icon-material: IRON_SWORD
+bar-color: RED
+bar-style: SOLID
+
+type: COMBAT
+scoring-mode: SUM
+score-formula: "1"
+target-score: 0
+
+farming-actions: []
+mining-materials: []
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 320
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: FRIDAY
+      time: "21:00"
+      duration: 45
+  in-rotation: true
+  rotation-weight: 9
+
+messages:
+  start: "&6★ Tournament &eMonster Slayer&6 has begun! Duration: &e{duration}m"
+  end: "&6★ Monster Slayer ended! Top killer: &e{winner} &7({score} kills)"
+  warning: "&6★ A &eMonster Slayer&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 4000.0
+    commands:
+      - "eco give {player} 400"
+    items:
+      - material: NETHERITE_SWORD
+        amount: 1
+        display-name: "&cSlayer's Blade"
+  2:
+    money: 2000.0
+    commands: []
+    items: []
+  3:
+    money: 1000.0
+    commands: []
+    items: []
+  0:
+    enabled: true
+    commands:
+      - "eco give {player} 30"
+
+integration:
+  defer-to-swagfishing: false
+  defer-to-swagfarming: false
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE

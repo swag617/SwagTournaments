@@ -1,0 +1,71 @@
+id: "diamond_rush"
+display-name: "&bDiamond Rush"
+description: "First to mine 50 diamond ores wins!"
+icon-material: DIAMOND_ORE
+bar-color: BLUE
+bar-style: SEGMENTED_12
+
+type: MINING
+scoring-mode: FIRST_TO
+score-formula: "1"
+target-score: 50
+
+farming-actions: []
+mining-materials:
+  - DIAMOND_ORE
+  - DEEPSLATE_DIAMOND_ORE
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 16
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: TUESDAY
+      time: "19:00"
+      duration: 60
+  in-rotation: true
+  rotation-weight: 7
+
+messages:
+  start: "&6★ Tournament &eDiamond Rush&6 has begun! First to &650 diamonds&6 wins!"
+  end: "&6★ Diamond Rush ended! Winner: &e{winner} &7(reached {score} diamonds!)"
+  warning: "&6★ A &eDiamond Rush&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 10000.0
+    commands:
+      - "eco give {player} 1000"
+    items:
+      - material: DIAMOND
+        amount: 16
+        display-name: "&bDiamond Rush Champion"
+  2:
+    money: 5000.0
+    commands: []
+    items: []
+  3:
+    money: 2500.0
+    commands: []
+    items: []
+  0:
+    enabled: false
+    commands: []
+
+integration:
+  defer-to-swagfishing: false
+  defer-to-swagfarming: false
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE

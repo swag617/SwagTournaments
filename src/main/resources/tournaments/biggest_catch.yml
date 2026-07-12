@@ -1,0 +1,69 @@
+id: "biggest_catch"
+display-name: "&bBiggest Catch"
+description: "Land the single largest fish by size!"
+icon-material: SALMON
+bar-color: BLUE
+bar-style: SEGMENTED_6
+
+type: FISHING
+scoring-mode: MAX
+score-formula: "size"
+target-score: 0
+
+farming-actions: []
+mining-materials: []
+combat-entities: []
+
+conditions:
+  biomes: []
+  worlds: []
+  time: ANY
+  weather: ANY
+  min-y: -64
+  max-y: 320
+  required-permission: ""
+
+schedule:
+  slots:
+    - day: SUNDAY
+      time: "14:00"
+      duration: 45
+  in-rotation: true
+  rotation-weight: 8
+
+messages:
+  start: "&6★ Tournament &eBiggest Catch&6 has begun! Duration: &e{duration}m"
+  end: "&6★ Tournament ended! Biggest catch: &e{winner} &7({score} size)"
+  warning: "&6★ A &eBiggest Catch&6 tournament begins in &e{time}&6!"
+
+rewards:
+  1:
+    money: 7500.0
+    commands:
+      - "eco give {player} 750"
+    items:
+      - material: FISHING_ROD
+        amount: 1
+        display-name: "&bChampion's Rod"
+  2:
+    money: 3000.0
+    commands: []
+    items: []
+  3:
+    money: 1500.0
+    commands: []
+    items: []
+  0:
+    enabled: false
+    commands: []
+
+integration:
+  defer-to-swagfishing: true
+  defer-to-swagfarming: false
+  discord-channel-key: "tournaments"
+
+cosmetics:
+  start-fireworks: true
+  end-fireworks: true
+  sound-start: ENTITY_PLAYER_LEVELUP
+  sound-end: UI_TOAST_CHALLENGE_COMPLETE
