@@ -5,8 +5,10 @@ api-version: '1.21'
 author: swag617
 description: Flexible tournaments plugin with web editor
 
-softdepend:
+depend:
   - SwagAPI
+
+softdepend:
   - SwagFishing
   - SwagFarming
   - DiscordUtils
