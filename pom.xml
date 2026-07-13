@@ -6,7 +6,7 @@
 
     <groupId>com.swag</groupId>
     <artifactId>SwagTournaments</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -102,14 +102,9 @@
             <systemPath>${project.basedir}/libs/SwagFarming-1.0.0.jar</systemPath>
         </dependency>
 
-        <!-- DiscordUtils soft dep -->
-        <dependency>
-            <groupId>com.swag</groupId>
-            <artifactId>DiscordUtils</artifactId>
-            <version>1.2-SNAPSHOT</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/libs/DiscordUtils-1.2-SNAPSHOT.jar</systemPath>
-        </dependency>
+        <!-- DiscordUtils integration now goes through SwagAPI's IEventBusService
+             (discordutils:notify channel) instead of a compile-time dependency —
+             see integration/DiscordIntegration.java. No jar needed here anymore. -->
     </dependencies>
 
     <build>

@@ -1,10 +1,12 @@
 web-editor:
   enabled: true
 
+# Published on SwagAPI's event bus (discordutils:notify channel). Requires DiscordUtils to
+# be installed with a matching "webhooks.<webhook-name>" entry in ITS config.yml — no
+# compile-time or reflection dependency on DiscordUtils from this plugin.
 discord:
   enabled: true
-  announcements-server: 1
-  announcements-channel-id: ""
+  webhook-name: "tournaments"
   live-updates-enabled: false
   live-updates-interval-minutes: 15
   colors:

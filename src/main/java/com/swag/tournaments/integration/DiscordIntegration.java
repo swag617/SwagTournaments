@@ -1,24 +1,31 @@
 package com.swag.tournaments.integration;
 
-import com.swag.discordutils.DiscordUtils;
-import com.swag.discordutils.discord.DiscordBot;
-import com.swag.discordutils.lib.jda.api.entities.MessageEmbed;
-import com.swag.discordutils.lib.jda.api.entities.channel.concrete.TextChannel;
-import com.swag.discordutils.util.CleanEmbedBuilder;
+import com.SwagDev.SwagAPI.api.IEventBusService;
+import com.SwagDev.SwagAPI.events.SwagCrossPluginMessageEvent;
 import com.swag.tournaments.SwagTournaments;
 import com.swag.tournaments.model.TournamentInstance;
 import com.swag.tournaments.model.TournamentParticipant;
 import com.swag.tournaments.model.TournamentTemplate;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.awt.Color;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Sends tournament lifecycle announcements via DiscordUtils / JDA.
- * All methods are safe no-ops if initialization failed.
+ * Sends tournament lifecycle announcements via SwagAPI's shared {@link IEventBusService},
+ * publishing to the {@code discordutils:notify} channel. DiscordUtils (if installed, with
+ * a matching {@code webhooks.tournaments} entry configured) picks it up and posts it — no
+ * compile-time dependency on DiscordUtils' internal classes or shaded JDA classpath.
+ *
+ * <p>This replaces an earlier tight coupling that imported DiscordUtils' {@code DiscordBot}
+ * and shaded JDA classes directly against a vendored {@code libs/DiscordUtils-*.jar}, which
+ * meant any DiscordUtils update could break this plugin's compile. All methods are safe
+ * no-ops if the event bus or a configured webhook isn't available.</p>
  */
 public class DiscordIntegration {
 
@@ -32,63 +39,38 @@ public class DiscordIntegration {
     );
 
     private final SwagTournaments plugin;
-    private DiscordBot discordBot;
-    private boolean available;
 
     public DiscordIntegration(SwagTournaments plugin) {
         this.plugin = plugin;
     }
 
-    public void initialize() {
-        try {
-            DiscordUtils discordUtils = (DiscordUtils) Bukkit.getPluginManager().getPlugin("DiscordUtils");
-            if (discordUtils == null) {
-                return;
-            }
-            discordBot = discordUtils.getDiscordBot();
-            available = discordBot != null && discordBot.isReady();
-        } catch (Throwable t) {
-            plugin.getLogger().warning("DiscordIntegration: failed to hook DiscordUtils: " + t.getMessage());
-            available = false;
-        }
-    }
-
     public void sendTournamentStart(TournamentInstance instance) {
-        if (!available || discordBot == null) return;
         if (!plugin.getConfig().getBoolean("discord.enabled", true)) return;
 
         TournamentTemplate template = instance.getTemplate();
-        Color color = typeColor(template);
+        List<Field> fields = new ArrayList<>();
+        fields.add(new Field("Type", template.getType().name(), true));
+        fields.add(new Field("Mode", template.getScoringMode().name(), true));
+        fields.add(new Field("Duration", instance.getTimeRemainingSeconds() / 60 + " minutes", true));
 
-        CleanEmbedBuilder builder = new CleanEmbedBuilder()
-                .setTitle("Tournament Started: " + stripColor(template.getDisplayName()))
-                .setDescription(template.getDescription().isEmpty()
-                        ? "A new tournament is underway!"
-                        : template.getDescription())
-                .setColor(color)
-                .addField("Type", template.getType().name(), true)
-                .addField("Mode", template.getScoringMode().name(), true)
-                .addField("Duration", instance.getTimeRemainingSeconds() / 60 + " minutes", true)
-                .setTimestamp(Instant.now());
-
-        sendToConfiguredChannel(template, builder.build());
+        publish(
+                "Tournament Started: " + stripColor(template.getDisplayName()),
+                template.getDescription().isEmpty() ? "A new tournament is underway!" : template.getDescription(),
+                typeColor(template),
+                fields
+        );
     }
 
     public void sendTournamentEnd(TournamentInstance instance) {
-        if (!available || discordBot == null) return;
         if (!plugin.getConfig().getBoolean("discord.enabled", true)) return;
 
         TournamentTemplate template = instance.getTemplate();
         List<TournamentParticipant> ranked = instance.getLeaderboard();
-        Color color = typeColor(template);
 
-        CleanEmbedBuilder builder = new CleanEmbedBuilder()
-                .setTitle("Tournament Ended: " + stripColor(template.getDisplayName()))
-                .setColor(color)
-                .setTimestamp(Instant.now());
-
+        String description;
+        List<Field> fields = new ArrayList<>();
         if (ranked.isEmpty()) {
-            builder.setDescription("No participants this time.");
+            description = "No participants this time.";
         } else {
             StringBuilder desc = new StringBuilder();
             String[] medals = {"🥇", "🥈", "🥉"};
@@ -98,30 +80,24 @@ public class DiscordIntegration {
                 desc.append(medals[i]).append(" **").append(p.getPlayerName()).append("** — ")
                         .append(formatScore(p.getScore())).append("\n");
             }
-            builder.setDescription(desc.toString());
-            builder.addField("Total Participants", String.valueOf(ranked.size()), true);
+            description = desc.toString();
+            fields.add(new Field("Total Participants", String.valueOf(ranked.size()), true));
         }
 
-        sendToConfiguredChannel(template, builder.build());
+        publish("Tournament Ended: " + stripColor(template.getDisplayName()), description, typeColor(template), fields);
     }
 
     public void sendLiveUpdate(TournamentInstance instance) {
-        if (!available || discordBot == null) return;
         if (!plugin.getConfig().getBoolean("discord.enabled", true)) return;
         if (!plugin.getConfig().getBoolean("discord.live-updates-enabled", false)) return;
 
         TournamentTemplate template = instance.getTemplate();
         List<TournamentParticipant> ranked = instance.getLeaderboard();
-        Color color = typeColor(template);
 
-        CleanEmbedBuilder builder = new CleanEmbedBuilder()
-                .setTitle("Live Standings: " + stripColor(template.getDisplayName()))
-                .setColor(color)
-                .setTimestamp(Instant.now());
-
+        String description;
         int show = Math.min(5, ranked.size());
         if (show == 0) {
-            builder.setDescription("No scores yet.");
+            description = "No scores yet.";
         } else {
             StringBuilder desc = new StringBuilder();
             for (int i = 0; i < show; i++) {
@@ -131,26 +107,44 @@ public class DiscordIntegration {
             }
             long rem = instance.getTimeRemainingSeconds();
             desc.append("\n*").append(rem / 60).append("m ").append(rem % 60).append("s remaining*");
-            builder.setDescription(desc.toString());
+            description = desc.toString();
         }
 
-        sendToConfiguredChannel(template, builder.build());
+        publish("Live Standings: " + stripColor(template.getDisplayName()), description, typeColor(template), List.of());
     }
 
-    private void sendToConfiguredChannel(TournamentTemplate template, MessageEmbed embed) {
-        int serverIndex = plugin.getConfig().getInt("discord.announcements-server", 1);
-        String channelId = plugin.getConfig().getString("discord.announcements-channel-id", "");
+    // -------------------------------------------------------------------------
+    // Internal
+    // -------------------------------------------------------------------------
 
-        if (channelId.isEmpty() || channelId.equalsIgnoreCase("YOUR_CHANNEL_ID")) return;
+    private record Field(String name, String value, boolean inline) {}
 
-        try {
-            TextChannel channel = discordBot.getTextChannel(serverIndex, channelId);
-            if (channel == null) return;
-            // Queue fires async on JDA thread pool — safe from main thread
-            channel.sendMessageEmbeds(embed).queue();
-        } catch (Throwable t) {
-            plugin.getLogger().warning("DiscordIntegration: failed to send embed: " + t.getMessage());
+    private void publish(String title, String description, Color color, List<Field> fields) {
+        RegisteredServiceProvider<IEventBusService> rsp =
+                Bukkit.getServicesManager().getRegistration(IEventBusService.class);
+        if (rsp == null) return;
+
+        String webhookName = plugin.getConfig().getString("discord.webhook-name", "tournaments");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("webhook", webhookName);
+        data.put("title", title);
+        data.put("description", description);
+        data.put("color", color.getRGB() & 0xFFFFFF);
+        if (!fields.isEmpty()) {
+            List<Map<String, Object>> fieldMaps = new ArrayList<>();
+            for (Field f : fields) {
+                Map<String, Object> fm = new HashMap<>();
+                fm.put("name", f.name());
+                fm.put("value", f.value());
+                fm.put("inline", f.inline());
+                fieldMaps.add(fm);
+            }
+            data.put("fields", fieldMaps);
         }
+
+        rsp.getProvider().publish(new SwagCrossPluginMessageEvent(
+                "discordutils:notify", "SwagTournaments", data, null));
     }
 
     private Color typeColor(TournamentTemplate template) {

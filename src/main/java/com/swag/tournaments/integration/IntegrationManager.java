@@ -52,10 +52,10 @@ public class IntegrationManager {
             swagFarmingBridge.initialize();
         }
 
-        if (discordPresent) {
-            discordIntegration = new DiscordIntegration(plugin);
-            discordIntegration.initialize();
-        }
+        // Always constructed — DiscordIntegration publishes on SwagAPI's event bus rather
+        // than depending on DiscordUtils directly, so there's no plugin-presence gate here.
+        // It's a safe no-op per send if the event bus or a matching webhook isn't available.
+        discordIntegration = new DiscordIntegration(plugin);
 
         log.info("Integrations active:"
                 + " SwagFishing=" + swagFishingPresent
