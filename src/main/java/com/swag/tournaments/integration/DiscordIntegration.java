@@ -131,6 +131,7 @@ public class DiscordIntegration {
         data.put("title", title);
         data.put("description", description);
         data.put("color", color.getRGB() & 0xFFFFFF);
+        data.put("username", "Tournaments");
         if (!fields.isEmpty()) {
             List<Map<String, Object>> fieldMaps = new ArrayList<>();
             for (Field f : fields) {
