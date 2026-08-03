@@ -39,7 +39,7 @@ SwagTournaments unifies tournament management across the Swag Development ecosys
 |---|---|
 | Paper 1.21+ | Yes |
 | Java 21 | Yes |
-| SwagAPI | Only for the web editor |
+| SwagAPI | **Yes** — declared as a hard `depend` in `plugin.yml`; Paper will refuse to enable SwagTournaments without it. At runtime only the web editor module actually calls into SwagAPI's `IWebService` (tournament data itself lives in the plugin's own bundled SQLite database) |
 | SwagFishing | No — enables FISHING bridge integration |
 | SwagFarming | No — enables FARMING bridge integration |
 | DiscordUtils | No — enables Discord announcements |

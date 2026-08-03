@@ -7,8 +7,10 @@ SwagTournaments ships a full browser-based editor for templates, scheduling, his
 `WebServerManager` implements `com.sun.net.httpserver.HttpHandler` directly. On startup (last step of `onEnable()`, after every other manager is ready):
 
 1. If `web-editor.enabled` is `false` in `config.yml`, the web editor is skipped entirely.
-2. It looks up `IWebService` from Bukkit's `ServicesManager`. If SwagAPI isn't installed (or its service isn't registered), a warning is logged and the web editor is simply unavailable — the rest of the plugin is unaffected.
+2. It looks up `IWebService` from Bukkit's `ServicesManager`. If the service isn't registered (e.g. SwagAPI's own web service failed to start), a warning is logged and the web editor is simply unavailable — the rest of the plugin is unaffected.
 3. If found, it calls `webService.registerModule(plugin, this)`, mounting SwagTournaments's routes at `/swagapi/swagtournaments/` under SwagAPI's shared HTTP server and thread pool.
+
+> **Note:** SwagAPI itself is a hard dependency for SwagTournaments (`depend: [SwagAPI]` in `plugin.yml`) — Paper won't enable SwagTournaments at all if SwagAPI isn't installed, regardless of whether the web editor is enabled. The graceful "service not registered" handling above only covers the narrower case where SwagAPI is present but its `IWebService` didn't come up (e.g. still initializing, or disabled in SwagAPI's own config).
 
 ```java
 public String getUrl() {

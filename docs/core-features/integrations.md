@@ -44,6 +44,6 @@ Active when `PlaceholderAPI` is detected — `TournamentsPlaceholders` self-regi
 
 ## SwagAPI (Web Editor)
 
-Not soft-detected the same way as the others — `WebServerManager.start()` looks up `IWebService` from Bukkit's services manager. If it isn't registered (SwagAPI not installed, or installed but its web service failed to start), the web editor logs a warning and simply doesn't register a mount point; nothing else about the plugin is affected. See [Web Editor Overview](../web-editor/overview.md).
+Unlike the integrations above, **SwagAPI is not a soft dependency** — `plugin.yml` declares `depend: [SwagAPI]`, so Paper will not enable SwagTournaments at all if SwagAPI isn't installed. Within the plugin, only `WebServerManager` actually calls into it: it looks up `IWebService` from Bukkit's services manager, and if that specific service isn't registered (e.g. SwagAPI is present but its own web service failed to start), the web editor logs a warning and simply doesn't register a mount point — the rest of the plugin (tournaments, scoring, rewards, commands) is unaffected by that narrower failure. See [Web Editor Overview](../web-editor/overview.md).
 
 Next: [PlaceholderAPI](placeholders.md)
