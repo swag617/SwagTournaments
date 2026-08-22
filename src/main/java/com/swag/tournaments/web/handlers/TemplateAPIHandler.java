@@ -172,53 +172,60 @@ public class TemplateAPIHandler implements HttpHandler {
         if (!tournamentsFolder.exists()) tournamentsFolder.mkdirs();
 
         File file = new File(tournamentsFolder, id + ".yml");
+        boolean isNewTemplate = !file.exists();
+
         YamlConfiguration cfg = new YamlConfiguration();
+        if (!isNewTemplate) {
+            try {
+                cfg.load(file);
+            } catch (Exception e) {
+                return "Failed to read existing template file before saving: " + e.getMessage();
+            }
+        }
 
         cfg.set("id", id);
         cfg.set("display-name", getString(json, "display-name", id));
         cfg.set("description", getString(json, "description", ""));
         cfg.set("icon-material", getString(json, "icon-material", "PAPER"));
         cfg.set("bar-color", getString(json, "bar-color", "WHITE"));
-        cfg.set("bar-style", getString(json, "bar-style", "SOLID"));
         cfg.set("type", getString(json, "type", "CUSTOM"));
         cfg.set("scoring-mode", getString(json, "scoring-mode", "SUM"));
         cfg.set("score-formula", getString(json, "score-formula", "1"));
         cfg.set("target-score", getDouble(json, "target-score", 0.0));
 
-        cfg.set("farming-actions", getStringList(json, "farming-actions"));
-        cfg.set("mining-materials", getStringList(json, "mining-materials"));
-        cfg.set("combat-entities", getStringList(json, "combat-entities"));
+        // The web editor's modal has no fields for these — the JS always posts
+        // placeholder defaults for them (empty lists, "SOLID", etc). Only seed
+        // them on first creation; on every later save, leave whatever is
+        // already in the file alone so hand-authored data (ore/action lists,
+        // spawn conditions, cron slots, warning message, reward items) survives
+        // instead of being clobbered by the placeholder on every web save.
+        if (isNewTemplate) {
+            cfg.set("bar-style", getString(json, "bar-style", "SOLID"));
+            cfg.set("farming-actions", getStringList(json, "farming-actions"));
+            cfg.set("mining-materials", getStringList(json, "mining-materials"));
+            cfg.set("combat-entities", getStringList(json, "combat-entities"));
 
-        JsonObject cond = getObj(json, "conditions");
-        cfg.set("conditions.biomes", getStringListFromObj(cond, "biomes"));
-        cfg.set("conditions.worlds", getStringListFromObj(cond, "worlds"));
-        cfg.set("conditions.time", getStringFromObj(cond, "time", "ANY"));
-        cfg.set("conditions.weather", getStringFromObj(cond, "weather", "ANY"));
-        cfg.set("conditions.min-y", getIntFromObj(cond, "min-y", -64));
-        cfg.set("conditions.max-y", getIntFromObj(cond, "max-y", 320));
-        cfg.set("conditions.required-permission", getStringFromObj(cond, "required-permission", ""));
+            JsonObject cond = getObj(json, "conditions");
+            cfg.set("conditions.biomes", getStringListFromObj(cond, "biomes"));
+            cfg.set("conditions.worlds", getStringListFromObj(cond, "worlds"));
+            cfg.set("conditions.time", getStringFromObj(cond, "time", "ANY"));
+            cfg.set("conditions.weather", getStringFromObj(cond, "weather", "ANY"));
+            cfg.set("conditions.min-y", getIntFromObj(cond, "min-y", -64));
+            cfg.set("conditions.max-y", getIntFromObj(cond, "max-y", 320));
+            cfg.set("conditions.required-permission", getStringFromObj(cond, "required-permission", ""));
+
+            cfg.set("schedule.slots", new ArrayList<Map<String, Object>>());
+            cfg.set("messages.warning", getStringFromObj(getObj(json, "messages"), "warning", ""));
+            cfg.set("integration.discord-channel-key", getStringFromObj(getObj(json, "integration"), "discord-channel-key", "tournaments"));
+        }
 
         JsonObject sched = getObj(json, "schedule");
         cfg.set("schedule.in-rotation", getBoolFromObj(sched, "in-rotation", false));
         cfg.set("schedule.rotation-weight", getIntFromObj(sched, "rotation-weight", 1));
 
-        List<Map<String, Object>> slots = new ArrayList<>();
-        if (sched != null && sched.has("slots") && sched.get("slots").isJsonArray()) {
-            for (JsonElement el : sched.getAsJsonArray("slots")) {
-                JsonObject s = el.getAsJsonObject();
-                Map<String, Object> slotMap = new LinkedHashMap<>();
-                slotMap.put("day", getStringFromObj(s, "day", "DAILY"));
-                slotMap.put("time", getStringFromObj(s, "time", "12:00"));
-                slotMap.put("duration", getIntFromObj(s, "duration", 60));
-                slots.add(slotMap);
-            }
-        }
-        cfg.set("schedule.slots", slots);
-
         JsonObject msgs = getObj(json, "messages");
         cfg.set("messages.start", getStringFromObj(msgs, "start", ""));
         cfg.set("messages.end", getStringFromObj(msgs, "end", ""));
-        cfg.set("messages.warning", getStringFromObj(msgs, "warning", ""));
 
         JsonObject rewards = getObj(json, "rewards");
         if (rewards != null) {
@@ -241,7 +248,6 @@ public class TemplateAPIHandler implements HttpHandler {
         JsonObject integ = getObj(json, "integration");
         cfg.set("integration.defer-to-swagfishing", getBoolFromObj(integ, "defer-to-swagfishing", false));
         cfg.set("integration.defer-to-swagfarming", getBoolFromObj(integ, "defer-to-swagfarming", false));
-        cfg.set("integration.discord-channel-key", getStringFromObj(integ, "discord-channel-key", "tournaments"));
 
         JsonObject cosm = getObj(json, "cosmetics");
         cfg.set("cosmetics.start-fireworks", getBoolFromObj(cosm, "start-fireworks", false));
