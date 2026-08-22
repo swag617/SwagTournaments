@@ -6,7 +6,7 @@
 
     <groupId>com.swag</groupId>
     <artifactId>SwagTournaments</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.3</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -61,13 +61,13 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- SwagAPI (hard dep, system scope) — shared IWebService for the web editor -->
+        <!-- SwagAPI (hard dep, system scope) — shared IWebService for the web editor, IPrefixService for the admin-overridable chat prefix -->
         <dependency>
             <groupId>com.SwagDev</groupId>
             <artifactId>SwagAPI</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.3</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/libs/SwagAPI-1.0.0.jar</systemPath>
+            <systemPath>${project.basedir}/libs/SwagAPI-1.0.3.jar</systemPath>
         </dependency>
 
         <!-- Gson (shaded + relocated) -->

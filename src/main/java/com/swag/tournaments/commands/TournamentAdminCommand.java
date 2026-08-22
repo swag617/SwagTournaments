@@ -34,13 +34,13 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("swagtournaments.admin")) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "You don't have permission.");
             return true;
         }
 
         if (args.length == 0) {
             if (!(sender instanceof Player player)) {
-                sender.sendMessage(ChatColor.RED + "Console cannot open a GUI.");
+                sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Console cannot open a GUI.");
                 return true;
             }
             AdminPanelGUI gui = new AdminPanelGUI(plugin, player, guiListener);
@@ -56,7 +56,7 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
             case "list" -> handleList(sender);
             case "score" -> handleScore(sender, args);
             case "webtrust" -> handleWebTrust(sender);
-            default -> sender.sendMessage(ChatColor.RED
+            default -> sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED
                     + "Unknown subcommand. Usage: /tadmin [start|stop|reload|list|score|webtrust]");
         }
         return true;
@@ -64,13 +64,13 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
 
     private void handleStart(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /tadmin start <templateId> [durationMinutes]");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Usage: /tadmin start <templateId> [durationMinutes]");
             return;
         }
 
         Optional<TournamentTemplate> opt = plugin.getTemplateManager().getTemplate(args[1]);
         if (opt.isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "No template found with ID '" + args[1] + "'.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No template found with ID '" + args[1] + "'.");
             return;
         }
 
@@ -80,7 +80,7 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
                 duration = Integer.parseInt(args[2]);
                 if (duration <= 0) throw new NumberFormatException();
             } catch (NumberFormatException e) {
-                sender.sendMessage(ChatColor.RED + "Invalid duration: must be a positive integer.");
+                sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Invalid duration: must be a positive integer.");
                 return;
             }
         }
@@ -88,16 +88,16 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
         TournamentTemplate template = opt.get();
         boolean started = plugin.getTournamentManager().startTournament(template, duration, "ADMIN");
         if (started) {
-            sender.sendMessage(ChatColor.GREEN + "Tournament '"
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Tournament '"
                     + template.getDisplayName() + "' started for " + duration + " minutes.");
         } else {
-            sender.sendMessage(ChatColor.RED + "Could not start — another tournament may be active.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Could not start — another tournament may be active.");
         }
     }
 
     private void handleStop(CommandSender sender) {
         if (!plugin.getTournamentManager().isActive()) {
-            sender.sendMessage(ChatColor.RED + "No active tournament to stop.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No active tournament to stop.");
             return;
         }
         plugin.getTournamentManager().stopTournament(sender);
@@ -106,10 +106,10 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
     private void handleReload(CommandSender sender, String[] args) {
         if (args.length >= 2) {
             plugin.getTemplateManager().reloadTemplate(args[1]);
-            sender.sendMessage(ChatColor.GREEN + "Reloaded template '" + args[1] + "'.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Reloaded template '" + args[1] + "'.");
         } else {
             plugin.getTemplateManager().reloadAll();
-            sender.sendMessage(ChatColor.GREEN + "Reloaded all templates: "
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Reloaded all templates: "
                     + plugin.getTemplateManager().getTemplates().size() + " loaded.");
         }
 
@@ -122,13 +122,13 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
     private void handleList(CommandSender sender) {
         Collection<TournamentTemplate> templates = plugin.getTemplateManager().getTemplates();
         if (templates.isEmpty()) {
-            sender.sendMessage(ChatColor.YELLOW + "No templates loaded.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "No templates loaded.");
             return;
         }
 
         TournamentInstance active = plugin.getTournamentManager().getCurrentInstance();
 
-        sender.sendMessage(ChatColor.GOLD + "=== Tournament Templates (" + templates.size() + ") ===");
+        sender.sendMessage(plugin.getChatPrefix() + ChatColor.GOLD + "=== Tournament Templates (" + templates.size() + ") ===");
         for (TournamentTemplate t : templates) {
             boolean isActive = active != null && active.getTemplate().getId().equals(t.getId());
             String statusTag = isActive ? ChatColor.GREEN + "[ACTIVE]" : ChatColor.GRAY + "[idle]";
@@ -141,23 +141,23 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
 
     private void handleScore(CommandSender sender, String[] args) {
         if (args.length < 3) {
-            sender.sendMessage(ChatColor.RED + "Usage: /tadmin score <player> <amount>");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Usage: /tadmin score <player> <amount>");
             return;
         }
 
         TournamentInstance active = plugin.getTournamentManager().getCurrentInstance();
         if (active == null) {
-            sender.sendMessage(ChatColor.RED + "No active tournament.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No active tournament.");
             return;
         }
         if (active.getTemplate().getType() != TournamentType.CUSTOM) {
-            sender.sendMessage(ChatColor.RED + "Manual score submission is only valid for CUSTOM type tournaments.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Manual score submission is only valid for CUSTOM type tournaments.");
             return;
         }
 
         Player target = Bukkit.getPlayer(args[1]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[1] + "' is not online.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Player '" + args[1] + "' is not online.");
             return;
         }
 
@@ -165,12 +165,12 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
         try {
             amount = Double.parseDouble(args[2]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid amount: " + args[2]);
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Invalid amount: " + args[2]);
             return;
         }
 
         plugin.getTournamentManager().submitScore(target, amount, Map.of("source", "ADMIN"));
-        sender.sendMessage(ChatColor.GREEN + "Submitted score " + amount + " for " + target.getName() + ".");
+        sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Submitted score " + amount + " for " + target.getName() + ".");
     }
 
     private void handleWebTrust(CommandSender sender) {
@@ -179,12 +179,12 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
         // just surfaces the panel URL; the admin authenticates via SwagAPI's /login page.
         String url = plugin.getWebServerManager() != null ? plugin.getWebServerManager().getUrl() : null;
         if (url == null) {
-            sender.sendMessage(ChatColor.RED + "Web editor is not currently available. "
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Web editor is not currently available. "
                     + "Check that SwagAPI is installed and web-editor.enabled is true.");
             return;
         }
 
-        sender.sendMessage(ChatColor.GREEN + "Web editor: " + ChatColor.YELLOW + url);
+        sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Web editor: " + ChatColor.YELLOW + url);
         sender.sendMessage(ChatColor.GRAY + "Log in with your SwagAPI panel account to access it.");
     }
 

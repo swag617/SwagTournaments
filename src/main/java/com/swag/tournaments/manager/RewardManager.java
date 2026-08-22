@@ -1,5 +1,6 @@
 package com.swag.tournaments.manager;
 
+import com.swag.tournaments.SwagTournaments;
 import com.swag.tournaments.database.TournamentRepository;
 import com.swag.tournaments.model.RewardTier;
 import com.swag.tournaments.model.TournamentInstance;
@@ -10,7 +11,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.RegisteredServiceProvider;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.List;
@@ -21,11 +21,11 @@ import java.util.logging.Logger;
 @SuppressWarnings("deprecation")
 public class RewardManager {
 
-    private final JavaPlugin plugin;
+    private final SwagTournaments plugin;
     private final Logger log;
     private Economy economy;
 
-    public RewardManager(JavaPlugin plugin) {
+    public RewardManager(SwagTournaments plugin) {
         this.plugin = plugin;
         this.log = plugin.getLogger();
     }
@@ -77,7 +77,7 @@ public class RewardManager {
         if (economy != null && tier.getMoney() > 0) {
             if (player != null) {
                 economy.depositPlayer(player, tier.getMoney());
-                player.sendMessage(ChatColor.GREEN + "You received " + ChatColor.YELLOW
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "You received " + ChatColor.YELLOW
                         + "$" + String.format("%.2f", tier.getMoney())
                         + ChatColor.GREEN + " for "
                         + (place == 0 ? "participating" : "placing #" + place) + "!");

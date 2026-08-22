@@ -1,5 +1,6 @@
 package com.swag.tournaments.manager;
 
+import com.swag.tournaments.SwagTournaments;
 import com.swag.tournaments.database.TournamentRepository;
 import com.swag.tournaments.engine.ScoringEngine;
 import com.swag.tournaments.engine.ScoringEngineRegistry;
@@ -11,7 +12,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.meta.FireworkMeta;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 @SuppressWarnings("deprecation")
 public class TournamentManager {
 
-    private final JavaPlugin plugin;
+    private final SwagTournaments plugin;
     private final Logger log;
     private final TournamentRepository repository;
     private final RewardManager rewardManager;
@@ -33,7 +33,7 @@ public class TournamentManager {
     private BukkitTask endTask;
     private BukkitTask barTask;
 
-    public TournamentManager(JavaPlugin plugin,
+    public TournamentManager(SwagTournaments plugin,
                              TournamentRepository repository,
                              RewardManager rewardManager,
                              ScoringEngineRegistry engineRegistry) {
@@ -94,7 +94,7 @@ public class TournamentManager {
 
         // Broadcast start
         String startMsg = buildStartMessage(template, durationMinutes);
-        Bukkit.broadcastMessage(startMsg);
+        Bukkit.broadcastMessage(plugin.getChatPrefix() + startMsg);
 
         // Fire start sound + fireworks
         if (!template.getSoundStart().isEmpty()) {
@@ -135,11 +135,11 @@ public class TournamentManager {
      */
     public void stopTournament(CommandSender initiator) {
         if (currentInstance == null || currentInstance.getStatus() != TournamentStatus.ACTIVE) {
-            if (initiator != null) initiator.sendMessage(ChatColor.RED + "No active tournament to stop.");
+            if (initiator != null) initiator.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No active tournament to stop.");
             return;
         }
         if (initiator != null) {
-            Bukkit.broadcastMessage(ChatColor.YELLOW + "Tournament stopped by "
+            Bukkit.broadcastMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "Tournament stopped by "
                     + initiator.getName() + ".");
         }
         finishTournament(initiator);
@@ -232,7 +232,7 @@ public class TournamentManager {
         if (instance.getTemplate().getScoringMode() == ScoringMode.FIRST_TO) {
             double target = instance.getTemplate().getTargetScore();
             if (target > 0 && newScore >= target) {
-                player.sendMessage(ChatColor.GOLD + "You reached the target score of "
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.GOLD + "You reached the target score of "
                         + (int) target + "! Tournament ending...");
                 // Schedule to next tick so the event handler finishes cleanly
                 Bukkit.getScheduler().runTask(plugin, () -> finishTournament(null));
@@ -348,7 +348,7 @@ public class TournamentManager {
                     .replace("{score}", formatScore(winner.getScore()));
         }
 
-        Bukkit.broadcastMessage(endMsg);
+        Bukkit.broadcastMessage(plugin.getChatPrefix() + endMsg);
 
         // Top 3 summary
         int show = Math.min(3, ranked.size());

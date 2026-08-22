@@ -1,5 +1,6 @@
 package com.swag.tournaments;
 
+import com.SwagDev.SwagAPI.api.IPrefixService;
 import com.swag.tournaments.commands.TournamentAdminCommand;
 import com.swag.tournaments.commands.TournamentCommand;
 import com.swag.tournaments.database.DatabaseManager;
@@ -15,8 +16,13 @@ import com.swag.tournaments.manager.TournamentManager;
 import com.swag.tournaments.placeholder.TournamentsPlaceholders;
 import com.swag.tournaments.web.WebServerManager;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Objects;
 
@@ -35,6 +41,9 @@ public class SwagTournaments extends JavaPlugin {
     private GUIListener guiListener;
     private WebServerManager webServerManager;
 
+    private IPrefixService prefixService;
+    private String chatPrefix;
+
     private boolean swagFishingPresent;
     private boolean swagFarmingPresent;
     private boolean discordUtilsPresent;
@@ -47,6 +56,25 @@ public class SwagTournaments extends JavaPlugin {
 
         // 1. Config
         saveDefaultConfig();
+
+        // 1b. Chat prefix — resolve SwagAPI's IPrefixService (per-plugin or global admin
+        // override from the web panel) once at startup, falling back to this plugin's own
+        // messages.yml "prefix" value unchanged if SwagAPI/the service isn't present or
+        // nothing is configured on the panel.
+        ServicesManager sm = getServer().getServicesManager();
+        var prefixProvider = sm.getRegistration(IPrefixService.class);
+        prefixService = (prefixProvider != null) ? prefixProvider.getProvider() : null;
+
+        String configuredPrefix = loadConfiguredPrefixFromMessagesYml();
+        String resolvedPrefix = (prefixService != null)
+                ? prefixService.getPrefix("SwagTournaments", configuredPrefix)
+                : configuredPrefix;
+        // Renders into legacy '&sect;' codes so every call site can just concatenate the result
+        // in front of its message without needing to translate it itself. A MiniMessage-tag
+        // admin override (e.g. "<gold>[FleaMC] </gold>") is parsed and re-serialized to legacy
+        // codes here too — a bare ChatColor.translateAlternateColorCodes call (the previous
+        // approach) only understands '&' codes and would leave MiniMessage tags as literal text.
+        chatPrefix = toLegacyPrefix(resolvedPrefix);
 
         // 2. Database — fail fast
         databaseManager = new DatabaseManager(this);
@@ -134,6 +162,25 @@ public class SwagTournaments extends JavaPlugin {
         getLogger().info("SwagTournaments disabled.");
     }
 
+    /**
+     * Reads the {@code prefix} key straight out of the bundled {@code messages.yml} resource
+     * (this file is never copied to disk / made user-editable — it's only read here as the
+     * fallback source for {@link IPrefixService}), so a server that never touches the SwagAPI
+     * web panel keeps exactly today's hardcoded value.
+     */
+    private String loadConfiguredPrefixFromMessagesYml() {
+        String fallback = "&8[&6Tournaments&8] &r";
+        try (InputStream in = getResource("messages.yml")) {
+            if (in == null) return fallback;
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(in, StandardCharsets.UTF_8));
+            return yaml.getString("prefix", fallback);
+        } catch (Exception e) {
+            getLogger().warning("Failed to read prefix from messages.yml, using default: " + e.getMessage());
+            return fallback;
+        }
+    }
+
     private void detectSoftDependencies() {
         swagFishingPresent = Bukkit.getPluginManager().getPlugin("SwagFishing") != null;
         swagFarmingPresent = Bukkit.getPluginManager().getPlugin("SwagFarming") != null;
@@ -181,6 +228,54 @@ public class SwagTournaments extends JavaPlugin {
     public SchedulerManager getSchedulerManager() { return schedulerManager; }
     public GUIListener getGUIListener() { return guiListener; }
     public WebServerManager getWebServerManager() { return webServerManager; }
+
+    /**
+     * The effective self-identifying chat prefix for this plugin: the SwagAPI admin panel's
+     * per-plugin or global override if one is set, else this plugin's own {@code messages.yml}
+     * {@code prefix} value unchanged. Resolved once at startup via {@link IPrefixService}.
+     */
+    private static final java.util.regex.Pattern LEGACY_HEX =
+            java.util.regex.Pattern.compile("(?i)[&§]#([0-9a-f]{6})");
+    private static final java.util.regex.Pattern LEGACY_CODE =
+            java.util.regex.Pattern.compile("(?i)[&§]([0-9a-fk-or])");
+    private static final java.util.Map<Character, String> LEGACY_TAGS = java.util.Map.ofEntries(
+            java.util.Map.entry('0', "<black>"), java.util.Map.entry('1', "<dark_blue>"), java.util.Map.entry('2', "<dark_green>"),
+            java.util.Map.entry('3', "<dark_aqua>"), java.util.Map.entry('4', "<dark_red>"), java.util.Map.entry('5', "<dark_purple>"),
+            java.util.Map.entry('6', "<gold>"), java.util.Map.entry('7', "<gray>"), java.util.Map.entry('8', "<dark_gray>"),
+            java.util.Map.entry('9', "<blue>"), java.util.Map.entry('a', "<green>"), java.util.Map.entry('b', "<aqua>"),
+            java.util.Map.entry('c', "<red>"), java.util.Map.entry('d', "<light_purple>"), java.util.Map.entry('e', "<yellow>"),
+            java.util.Map.entry('f', "<white>"), java.util.Map.entry('k', "<obfuscated>"), java.util.Map.entry('l', "<bold>"),
+            java.util.Map.entry('m', "<strikethrough>"), java.util.Map.entry('n', "<underlined>"), java.util.Map.entry('o', "<italic>"),
+            java.util.Map.entry('r', "<reset>"));
+
+    /**
+     * Renders a stored prefix value from SwagAPI's IPrefixService — which may be MiniMessage
+     * tags (admin-typed via the web panel), legacy {@code &}/{@code §} codes (this plugin's own
+     * fallback constants), or a mix — into a legacy §-coded string safe for this plugin's
+     * ChatColor/sendMessage(String) pipeline. Without this, a MiniMessage-tag override (e.g.
+     * {@code <gold>[FleaMC] </gold>}) would show its literal tag text instead of rendering.
+     */
+    private static String toLegacyPrefix(String raw) {
+        if (raw == null || raw.isEmpty()) return raw;
+        var hex = LEGACY_HEX.matcher(raw);
+        StringBuilder sb = new StringBuilder();
+        while (hex.find()) hex.appendReplacement(sb, "<#" + hex.group(1) + ">");
+        hex.appendTail(sb);
+        raw = sb.toString();
+
+        var code = LEGACY_CODE.matcher(raw);
+        StringBuilder sb2 = new StringBuilder();
+        while (code.find()) {
+            String tag = LEGACY_TAGS.get(Character.toLowerCase(code.group(1).charAt(0)));
+            code.appendReplacement(sb2, tag != null ? java.util.regex.Matcher.quoteReplacement(tag) : "");
+        }
+        code.appendTail(sb2);
+
+        var component = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(sb2.toString());
+        return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection().serialize(component);
+    }
+
+    public String getChatPrefix() { return chatPrefix; }
 
     // ---- Integration state ----
 

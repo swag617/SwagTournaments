@@ -35,12 +35,12 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(ChatColor.RED + "This command is player-only.");
+            sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "This command is player-only.");
             return true;
         }
 
         if (!player.hasPermission("swagtournaments.use")) {
-            player.sendMessage(ChatColor.RED + "You don't have permission to use this.");
+            player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "You don't have permission to use this.");
             return true;
         }
 
@@ -58,7 +58,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             case "stats" -> handleStats(player, args);
             case "next" -> handleNext(player);
             default -> {
-                player.sendMessage(ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next]");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next]");
             }
         }
         return true;
@@ -70,7 +70,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 2) {
             Optional<TournamentTemplate> opt = plugin.getTemplateManager().getTemplate(args[1]);
             if (opt.isEmpty()) {
-                player.sendMessage(ChatColor.RED + "No template found with ID '" + args[1] + "'.");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No template found with ID '" + args[1] + "'.");
                 return;
             }
             template = opt.get();
@@ -98,7 +98,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 2) {
             Optional<TournamentTemplate> opt = plugin.getTemplateManager().getTemplate(args[1]);
             if (opt.isEmpty()) {
-                player.sendMessage(ChatColor.RED + "No template found with ID '" + args[1] + "'.");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "No template found with ID '" + args[1] + "'.");
                 return;
             }
             template = opt.get();
@@ -107,7 +107,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             if (active != null) {
                 template = active.getTemplate();
             } else {
-                player.sendMessage(ChatColor.YELLOW + "No active tournament. Specify a template ID.");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "No active tournament. Specify a template ID.");
                 return;
             }
         }
@@ -143,10 +143,10 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             Map<String, Object> stats = repo.getPlayerStats(targetUuid);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (stats == null) {
-                    player.sendMessage(ChatColor.YELLOW + "No tournament stats found for " + finalName + ".");
+                    player.sendMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "No tournament stats found for " + finalName + ".");
                     return;
                 }
-                player.sendMessage(ChatColor.GOLD + "=== Tournament Stats: " + ChatColor.YELLOW + finalName + ChatColor.GOLD + " ===");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.GOLD + "=== Tournament Stats: " + ChatColor.YELLOW + finalName + ChatColor.GOLD + " ===");
                 player.sendMessage(ChatColor.GRAY + "Entered:    " + ChatColor.WHITE + stats.get("tournaments_entered"));
                 player.sendMessage(ChatColor.GRAY + "Won:        " + ChatColor.WHITE + stats.get("tournaments_won"));
                 player.sendMessage(ChatColor.GRAY + "1st Places: " + ChatColor.WHITE + stats.get("total_first_places"));
@@ -161,13 +161,13 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
     private void handleNext(Player player) {
         SchedulerManager scheduler = plugin.getSchedulerManager();
         if (scheduler == null) {
-            player.sendMessage(ChatColor.YELLOW + "Scheduler is not active.");
+            player.sendMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "Scheduler is not active.");
             return;
         }
 
         Optional<SchedulerManager.NextSchedule> next = scheduler.getNextScheduledStart();
         if (next.isEmpty()) {
-            player.sendMessage(ChatColor.YELLOW + "No scheduled tournaments found.");
+            player.sendMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "No scheduled tournaments found.");
             return;
         }
 
@@ -176,7 +176,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
                 ns.fireTime().atZone(java.time.ZoneId.systemDefault())
                         .toInstant().toEpochMilli()));
 
-        player.sendMessage(ChatColor.GOLD + "Next Tournament: "
+        player.sendMessage(plugin.getChatPrefix() + ChatColor.GOLD + "Next Tournament: "
                 + ChatColor.YELLOW + ns.template().getDisplayName()
                 + ChatColor.GRAY + " at " + ChatColor.WHITE + when
                 + ChatColor.GRAY + " (" + ns.template().getType().name() + ")");
