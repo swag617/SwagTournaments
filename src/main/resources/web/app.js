@@ -520,7 +520,7 @@ function showToast(msg) {
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'toast';
-        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e2a4a;border:1px solid #44bb44;color:#e0e0e0;padding:10px 20px;border-radius:8px;font-size:.875rem;z-index:999;transition:opacity .3s;';
+        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#24242f;border:1px solid #5fe05f;color:#e4e4ea;padding:10px 20px;border-radius:8px;font-size:.875rem;z-index:999;transition:opacity .3s;';
         document.body.appendChild(toast);
     }
     toast.textContent = msg;

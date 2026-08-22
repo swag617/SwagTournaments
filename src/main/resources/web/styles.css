@@ -1,20 +1,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --surface2: #1e2a4a;
-    --accent: #0f3460;
-    --highlight: #e94560;
-    --text: #e0e0e0;
-    --text-muted: #8899aa;
-    --border: #2a3a5a;
-    --green: #44bb44;
-    --yellow: #ffdd00;
-    --red: #ff4444;
-    --blue: #3399ff;
+    /* Aligned to the SwagAPI dashboard / SwagFishing editor's brand palette —
+       same token roles as this file always had, values swapped to match. */
+    --bg: #16161c;
+    --surface: #1c1c24;
+    --surface2: #24242f;
+    --accent: #24242f;
+    --highlight: #667eea;
+    --text: #e4e4ea;
+    --text-muted: #8b8b96;
+    --border: #2a2a35;
+    --green: #5fe05f;
+    --yellow: #f0c060;
+    --red: #ec5f5f;
+    --blue: #667eea;
     --radius: 8px;
-    --font: 'Segoe UI', system-ui, sans-serif;
+    --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 body {
