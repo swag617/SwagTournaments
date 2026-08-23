@@ -97,9 +97,9 @@
         <dependency>
             <groupId>com.swag</groupId>
             <artifactId>SwagFarming</artifactId>
-            <version>1.0.0</version>
+            <version>1.2.3</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/libs/SwagFarming-1.0.0.jar</systemPath>
+            <systemPath>${project.basedir}/libs/SwagFarming-1.2.3.jar</systemPath>
         </dependency>
 
         <!-- DiscordUtils integration now goes through SwagAPI's IEventBusService
