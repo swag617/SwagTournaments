@@ -18,6 +18,7 @@ import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.EnumMap;
 import java.util.Map;
 
 /**
@@ -33,6 +34,34 @@ import java.util.Map;
 public class SwagFishingBridge implements Listener {
 
     private static final String SWAGFISHING_NAMESPACE = "swagfishing";
+
+    // SwagFishing's FishingListener#addFishData stamps caught items with this key
+    // (org.bukkit.NamespacedKey(plugin, "catch_size"), PersistentDataType.DOUBLE).
+    // NOTE: this bridge previously looked for a "fish_size" key that SwagFishing never wrote,
+    // so every catch silently scored as a flat 1.0 — fixed 2026-08-22. See SwagFishing's
+    // FishingListener.java addFishData() for the writer.
+    private static final String PDC_KEY_SIZE = "catch_size";
+
+    // SwagFishing's FishingListener#addFishData also stamps a STRING PDC key with the caught
+    // fish's Fish.FishRarity name (e.g. "PRISMATIC"), added alongside catch_size specifically so
+    // rarity-aware tournament scoring doesn't need to depend on SwagFishing internals.
+    private static final String PDC_KEY_RARITY = "fish_rarity";
+
+    // Rarity score multiplier, ordered rarest-to-lowest chance to highest-to-lowest.
+    // SwagFishing's Fish.FishRarity carries a "baseWeight" per tier (spawn-chance weight, NOT a
+    // scoring multiplier — QUARTZ=1.0 down to PRISMATIC=0.005), so it isn't reused directly here.
+    // Instead this is a simple ordinal-based scale: each tier up is worth meaningfully more,
+    // mirroring the tiers' relative rarity without hard-coupling to spawn-weight semantics.
+    private static final Map<com.swagserv.swagfishing.models.Fish.FishRarity, Double> RARITY_MULTIPLIERS =
+            new EnumMap<>(com.swagserv.swagfishing.models.Fish.FishRarity.class);
+    static {
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.QUARTZ, 1.0);
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.EMERALD, 1.5);
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.SAPPHIRE, 2.0);
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.RUBY, 3.0);
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.AMETHYST, 5.0);
+        RARITY_MULTIPLIERS.put(com.swagserv.swagfishing.models.Fish.FishRarity.PRISMATIC, 10.0);
+    }
 
     private final SwagTournaments plugin;
     private SwagFishing swagFishing;
@@ -118,29 +147,51 @@ public class SwagFishingBridge implements Listener {
         if (!instance.getTemplate().isDeferToSwagFishing()) return;
 
         Player player = event.getPlayer();
-        double size = 0.0;
+        double size = 1.0;
+        double rarityMultiplier = 1.0;
 
         if (event.getCaught() instanceof Item item) {
-            // Try to read fish_size from SwagFishing PDC
             try {
-                NamespacedKey sizeKey = new NamespacedKey(SWAGFISHING_NAMESPACE, "fish_size");
                 var meta = item.getItemStack().getItemMeta();
-                if (meta != null && meta.getPersistentDataContainer().has(sizeKey, PersistentDataType.DOUBLE)) {
-                    size = meta.getPersistentDataContainer().get(sizeKey, PersistentDataType.DOUBLE);
-                } else {
-                    size = 1.0;
+                if (meta != null) {
+                    NamespacedKey sizeKey = new NamespacedKey(SWAGFISHING_NAMESPACE, PDC_KEY_SIZE);
+                    if (meta.getPersistentDataContainer().has(sizeKey, PersistentDataType.DOUBLE)) {
+                        size = meta.getPersistentDataContainer().get(sizeKey, PersistentDataType.DOUBLE);
+                    }
+
+                    NamespacedKey rarityKey = new NamespacedKey(SWAGFISHING_NAMESPACE, PDC_KEY_RARITY);
+                    if (meta.getPersistentDataContainer().has(rarityKey, PersistentDataType.STRING)) {
+                        String rarityName = meta.getPersistentDataContainer().get(rarityKey, PersistentDataType.STRING);
+                        try {
+                            var rarity = com.swagserv.swagfishing.models.Fish.FishRarity.valueOf(rarityName);
+                            rarityMultiplier = RARITY_MULTIPLIERS.getOrDefault(rarity, 1.0);
+                        } catch (IllegalArgumentException ignored) {
+                            // Unknown/future rarity tier — fall back to neutral multiplier.
+                        }
+                    }
                 }
             } catch (Exception e) {
                 size = 1.0;
+                rarityMultiplier = 1.0;
             }
-        } else {
-            size = 1.0;
         }
 
         final double finalSize = size;
-        Map<String, Double> vars = Map.of("size", finalSize, "value", finalSize);
+        final double finalRarityMultiplier = rarityMultiplier;
+        // "size" and "value" are preserved for existing score-formula templates; "rarity" and
+        // "rarityMultiplier" are additive so new templates can weight by fish rarity tier without
+        // breaking formulas that only reference size/value.
+        Map<String, Double> vars = Map.of(
+                "size", finalSize,
+                "value", finalSize,
+                "rarity", finalRarityMultiplier,
+                "rarityMultiplier", finalRarityMultiplier
+        );
         double delta = FormulaEvaluator.evaluate(instance.getTemplate().getScoreFormula(), vars);
 
-        plugin.getTournamentManager().submitScore(player, delta, Map.of("size", finalSize));
+        plugin.getTournamentManager().submitScore(player, delta, Map.of(
+                "size", finalSize,
+                "rarityMultiplier", finalRarityMultiplier
+        ));
     }
 }
