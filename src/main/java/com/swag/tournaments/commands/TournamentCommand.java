@@ -21,7 +21,7 @@ import java.util.*;
 @SuppressWarnings("deprecation")
 public class TournamentCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBS = List.of("info", "top", "history", "stats", "next", "profile");
+    private static final List<String> SUBS = List.of("info", "top", "history", "stats", "next", "profile", "halloffame", "records");
     private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("EEE MM/dd HH:mm");
 
     private final SwagTournaments plugin;
@@ -58,8 +58,9 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             case "stats" -> handleStats(player, args);
             case "next" -> handleNext(player);
             case "profile" -> handleProfile(player, args);
+            case "halloffame", "records" -> handleHallOfFame(player);
             default -> {
-                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next|profile]");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next|profile|halloffame]");
             }
         }
         return true;
@@ -171,6 +172,11 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         }
 
         PlayerProfileGUI gui = new PlayerProfileGUI(plugin, player, guiListener, target);
+        gui.openAsync();
+    }
+
+    private void handleHallOfFame(Player player) {
+        HallOfFameGUI gui = new HallOfFameGUI(plugin, player, guiListener);
         gui.openAsync();
     }
 

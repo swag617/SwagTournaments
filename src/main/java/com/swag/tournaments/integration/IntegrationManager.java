@@ -2,6 +2,7 @@ package com.swag.tournaments.integration;
 
 import com.swag.tournaments.SwagTournaments;
 import com.swag.tournaments.model.TournamentInstance;
+import com.swag.tournaments.model.TournamentTemplate;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -79,6 +80,16 @@ public class IntegrationManager {
     public void onTournamentEnd(TournamentInstance instance) {
         if (discordIntegration != null) {
             discordIntegration.sendTournamentEnd(instance);
+        }
+    }
+
+    /**
+     * Called when a tournament's winner sets a genuine new all-time-best score for its
+     * template (Feature 2 — Hall of Fame). Routes to Discord announce.
+     */
+    public void onHallOfFameRecord(TournamentTemplate template, String playerName, double score) {
+        if (discordIntegration != null) {
+            discordIntegration.sendHallOfFameRecord(template, playerName, score);
         }
     }
 

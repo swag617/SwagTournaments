@@ -192,6 +192,7 @@ public class TournamentManager {
         double winnerScore = ranked.isEmpty() ? 0.0 : ranked.get(0).getScore();
         int participantCount = ranked.size();
         long instanceId = instance.getInstanceId();
+        TournamentParticipant winner = ranked.isEmpty() ? null : ranked.get(0);
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             // Flush all score rows first
@@ -204,6 +205,18 @@ public class TournamentManager {
             repository.bulkFinalizeRanks(instanceId, ranked);
             repository.finalizeInstance(instanceId, endedAt, winnerId, winnerScore,
                     participantCount, TournamentStatus.ENDED);
+
+            // Feature 2 (Hall of Fame): conditional per-template record upsert. Only a
+            // genuine improvement (or first-ever completion) returns true — see
+            // TournamentRepository#upsertTemplateRecord for the verified WHERE-guard semantics.
+            if (winner != null) {
+                boolean isNewRecord = repository.upsertTemplateRecord(
+                        template.getId(), winner.getPlayerUuid(), winner.getPlayerName(),
+                        winner.getScore(), instanceId, endedAt);
+                if (isNewRecord) {
+                    Bukkit.getScheduler().runTask(plugin, () -> announceNewRecord(template, winner));
+                }
+            }
         });
 
         if (integrationManager != null) {
@@ -365,6 +378,22 @@ public class TournamentManager {
             Bukkit.broadcastMessage(medal + ChatColor.WHITE + ": "
                     + ChatColor.YELLOW + p.getPlayerName()
                     + ChatColor.GRAY + " — " + formatScore(p.getScore()));
+        }
+    }
+
+    /**
+     * Feature 2 (Hall of Fame): broadcasts and announces a genuine new all-time-best score
+     * for a template. Called only after {@link TournamentRepository#upsertTemplateRecord}
+     * reports a real change (main thread, via the runTask hop in {@link #finishTournament}).
+     */
+    private void announceNewRecord(TournamentTemplate template, TournamentParticipant winner) {
+        Bukkit.broadcastMessage(plugin.getChatPrefix() + ChatColor.GOLD + "🏆 New record! "
+                + ChatColor.YELLOW + winner.getPlayerName() + ChatColor.GOLD
+                + " set a new all-time high in " + ChatColor.YELLOW + template.getFormattedDisplayName()
+                + ChatColor.GOLD + ": " + ChatColor.YELLOW + formatScore(winner.getScore()) + ChatColor.GOLD + "!");
+
+        if (integrationManager != null) {
+            integrationManager.onHallOfFameRecord(template, winner.getPlayerName(), winner.getScore());
         }
     }
 

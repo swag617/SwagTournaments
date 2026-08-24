@@ -102,6 +102,21 @@ public class DatabaseManager {
                         PRIMARY KEY (player_uuid, type)
                     )
                     """);
+
+            // Feature 2 (Hall of Fame): one all-time-best row per tournament TEMPLATE (not
+            // type, not a single global ranking — different templates use different
+            // ScoringModes, so a raw score is only meaningful compared against the same
+            // template's own history). Net-new table, no migration idiom needed.
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS template_records (
+                        template_id TEXT PRIMARY KEY,
+                        player_uuid TEXT NOT NULL,
+                        player_name TEXT NOT NULL,
+                        score REAL NOT NULL,
+                        instance_id INTEGER,
+                        achieved_at INTEGER NOT NULL
+                    )
+                    """);
         }
 
         // Migrations: add columns that may not exist on databases created before this feature

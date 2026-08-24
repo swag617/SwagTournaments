@@ -113,6 +113,27 @@ public class DiscordIntegration {
         publish("Live Standings: " + stripColor(template.getDisplayName()), description, typeColor(template), List.of());
     }
 
+    /**
+     * Feature 2 (Hall of Fame): announces a genuine new all-time-best score for a template.
+     * Only called by TournamentManager after the conditional DB upsert confirms a real
+     * improvement (or first-ever completion) — never a no-op re-announce.
+     */
+    public void sendHallOfFameRecord(TournamentTemplate template, String playerName, double score) {
+        if (!plugin.getConfig().getBoolean("discord.enabled", true)) return;
+
+        List<Field> fields = new ArrayList<>();
+        fields.add(new Field("Player", playerName, true));
+        fields.add(new Field("Score", formatScore(score), true));
+        fields.add(new Field("Type", template.getType().name(), true));
+
+        publish(
+                "🏆 New Hall of Fame Record: " + stripColor(template.getDisplayName()),
+                "**" + playerName + "** set a new all-time high score of **" + formatScore(score) + "**!",
+                typeColor(template),
+                fields
+        );
+    }
+
     // -------------------------------------------------------------------------
     // Internal
     // -------------------------------------------------------------------------

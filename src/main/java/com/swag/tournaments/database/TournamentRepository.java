@@ -331,4 +331,97 @@ public class TournamentRepository {
             log.severe("Failed to add lifetime reward for " + uuid + ": " + e.getMessage());
         }
     }
+
+    /**
+     * Feature 2 (Hall of Fame): conditionally upserts the all-time-best score for a
+     * tournament template. The {@code WHERE excluded.score > template_records.score} clause
+     * makes the {@code DO UPDATE} a no-op when {@code score} isn't a genuine improvement
+     * (including ties — strictly greater only), so a fresh insert (no existing row) or a
+     * real improvement both return {@code true}; an equal-or-lower score returns {@code false}
+     * and leaves the existing record row untouched. Verified against SQLite JDBC 3.45.3.0's
+     * actual {@code executeUpdate()} affected-row semantics via a standalone probe: 1 for a
+     * genuine insert/update, 0 when the WHERE guard blocks the conditional update — see
+     * commit notes for Feature 2. Callers use the return value to decide whether to
+     * broadcast/announce a new record.
+     */
+    public boolean upsertTemplateRecord(String templateId, UUID uuid, String playerName,
+                                        double score, long instanceId, long achievedAt) {
+        String sql = """
+                INSERT INTO template_records (template_id, player_uuid, player_name, score, instance_id, achieved_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(template_id) DO UPDATE SET
+                    player_uuid = excluded.player_uuid,
+                    player_name = excluded.player_name,
+                    score = excluded.score,
+                    instance_id = excluded.instance_id,
+                    achieved_at = excluded.achieved_at
+                WHERE excluded.score > template_records.score
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, templateId);
+            ps.setString(2, uuid.toString());
+            ps.setString(3, playerName);
+            ps.setDouble(4, score);
+            ps.setLong(5, instanceId);
+            ps.setLong(6, achievedAt);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            log.severe("Failed to upsert template record for " + templateId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Returns the all-time-best record row for a single template, or {@code null} if the
+     * template has never been completed with at least one participant.
+     */
+    public Map<String, Object> getTemplateRecord(String templateId) {
+        String sql = """
+                SELECT template_id, player_uuid, player_name, score, instance_id, achieved_at
+                FROM template_records
+                WHERE template_id=?
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, templateId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapTemplateRecordRow(rs);
+            }
+        } catch (SQLException e) {
+            log.severe("Failed to fetch template record for " + templateId + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Returns all template record rows (small table — at most one row per template, currently
+     * 6 bundled templates). Used by the Hall of Fame GUI; templates with no completed
+     * tournament simply have no entry in the returned map.
+     */
+    public Map<String, Map<String, Object>> getAllTemplateRecords() {
+        Map<String, Map<String, Object>> results = new LinkedHashMap<>();
+        String sql = """
+                SELECT template_id, player_uuid, player_name, score, instance_id, achieved_at
+                FROM template_records
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                results.put(rs.getString("template_id"), mapTemplateRecordRow(rs));
+            }
+        } catch (SQLException e) {
+            log.severe("Failed to fetch template records: " + e.getMessage());
+        }
+        return results;
+    }
+
+    private Map<String, Object> mapTemplateRecordRow(ResultSet rs) throws SQLException {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("template_id", rs.getString("template_id"));
+        row.put("player_uuid", rs.getString("player_uuid"));
+        row.put("player_name", rs.getString("player_name"));
+        row.put("score", rs.getDouble("score"));
+        row.put("instance_id", rs.getLong("instance_id"));
+        row.put("achieved_at", rs.getLong("achieved_at"));
+        return row;
+    }
 }
