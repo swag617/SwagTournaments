@@ -199,6 +199,7 @@ public class TournamentManager {
                 TournamentParticipant p = ranked.get(i);
                 repository.upsertScore(instanceId, p.getPlayerUuid(), p.getPlayerName(), p.getScore());
                 repository.incrementPlayerStats(p.getPlayerUuid(), p.getPlayerName(), i + 1, p.getScore());
+                repository.incrementPlayerTypeStats(p.getPlayerUuid(), p.getPlayerName(), template.getType(), i + 1, p.getScore());
             }
             repository.bulkFinalizeRanks(instanceId, ranked);
             repository.finalizeInstance(instanceId, endedAt, winnerId, winnerScore,
@@ -290,6 +291,7 @@ public class TournamentManager {
             TournamentParticipant p = ranked.get(i);
             repository.upsertScore(instanceId, p.getPlayerUuid(), p.getPlayerName(), p.getScore());
             repository.incrementPlayerStats(p.getPlayerUuid(), p.getPlayerName(), i + 1, p.getScore());
+            repository.incrementPlayerTypeStats(p.getPlayerUuid(), p.getPlayerName(), instance.getTemplate().getType(), i + 1, p.getScore());
         }
         repository.bulkFinalizeRanks(instanceId, ranked);
         repository.finalizeInstance(instanceId, endedAt, winnerId, winnerScore,

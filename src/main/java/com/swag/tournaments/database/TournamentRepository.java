@@ -1,7 +1,9 @@
 package com.swag.tournaments.database;
 
+import com.swag.tournaments.model.PlayerTypeStats;
 import com.swag.tournaments.model.TournamentParticipant;
 import com.swag.tournaments.model.TournamentStatus;
+import com.swag.tournaments.model.TournamentType;
 
 import java.sql.*;
 import java.util.*;
@@ -165,7 +167,7 @@ public class TournamentRepository {
         String sql = """
                 SELECT player_name, tournaments_entered, tournaments_won,
                        total_first_places, total_second_places, total_third_places,
-                       best_score_ever, last_seen, first_seen
+                       best_score_ever, last_seen, first_seen, lifetime_rewards_money
                 FROM player_tournament_stats
                 WHERE player_uuid=?
                 """;
@@ -183,6 +185,7 @@ public class TournamentRepository {
                     row.put("best_score_ever", rs.getDouble("best_score_ever"));
                     row.put("last_seen", rs.getLong("last_seen"));
                     row.put("first_seen", rs.getLong("first_seen"));
+                    row.put("lifetime_rewards_money", rs.getDouble("lifetime_rewards_money"));
                     return row;
                 }
             }
@@ -223,6 +226,109 @@ public class TournamentRepository {
             ps.executeUpdate();
         } catch (SQLException e) {
             log.severe("Failed to increment player stats for " + uuid + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Upserts the per-{@link TournamentType} breakdown row for a player, mirroring
+     * {@link #incrementPlayerStats(UUID, String, int, double)}'s place-based counting
+     * (won/first_places both count place==1; second/third_places count place==2/3;
+     * entered always increments; best_score tracks the max seen).
+     * playerName is accepted for signature parity with incrementPlayerStats but isn't stored
+     * here — the canonical player_name lives on player_tournament_stats.
+     */
+    public void incrementPlayerTypeStats(UUID uuid, String playerName, TournamentType type, int place, double score) {
+        String sql = """
+                INSERT INTO player_type_stats
+                    (player_uuid, type, entered, won, first_places, second_places, third_places, best_score)
+                VALUES (?, ?, 1, ?, ?, ?, ?, ?)
+                ON CONFLICT(player_uuid, type) DO UPDATE SET
+                    entered=entered + 1,
+                    won=won + excluded.won,
+                    first_places=first_places + excluded.first_places,
+                    second_places=second_places + excluded.second_places,
+                    third_places=third_places + excluded.third_places,
+                    best_score=MAX(best_score, excluded.best_score)
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, type.name());
+            ps.setInt(3, place == 1 ? 1 : 0);
+            ps.setInt(4, place == 1 ? 1 : 0);
+            ps.setInt(5, place == 2 ? 1 : 0);
+            ps.setInt(6, place == 3 ? 1 : 0);
+            ps.setDouble(7, score);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.severe("Failed to increment player type stats for " + uuid + " (" + type + "): " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the per-type breakdown for a player across all {@link TournamentType} values.
+     * Types the player has never played come back zeroed rather than being omitted, so callers
+     * (e.g. the profile GUI) can render a full 6-row grid without null-checking.
+     */
+    public Map<TournamentType, PlayerTypeStats> getPlayerTypeStats(UUID uuid) {
+        Map<TournamentType, PlayerTypeStats> result = new EnumMap<>(TournamentType.class);
+        for (TournamentType type : TournamentType.values()) {
+            result.put(type, new PlayerTypeStats(type, 0, 0, 0, 0, 0, 0.0));
+        }
+
+        String sql = """
+                SELECT type, entered, won, first_places, second_places, third_places, best_score
+                FROM player_type_stats
+                WHERE player_uuid=?
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    TournamentType type;
+                    try {
+                        type = TournamentType.valueOf(rs.getString("type"));
+                    } catch (IllegalArgumentException e) {
+                        continue; // unknown/stale type string — skip rather than fail the whole load
+                    }
+                    result.put(type, new PlayerTypeStats(
+                            type,
+                            rs.getInt("entered"),
+                            rs.getInt("won"),
+                            rs.getInt("first_places"),
+                            rs.getInt("second_places"),
+                            rs.getInt("third_places"),
+                            rs.getDouble("best_score")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            log.severe("Failed to fetch player type stats for " + uuid + ": " + e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Adds to a player's lifetime tournament-reward money total on player_tournament_stats.
+     * Upsert-safe: if the row doesn't exist yet (e.g. a very first reward racing ahead of
+     * incrementPlayerStats's own async flush — see TournamentManager#finishTournament, where
+     * RewardManager.distribute() runs, and schedules this, before the score-flush block that
+     * calls incrementPlayerStats), a placeholder player_name (the UUID string) is inserted;
+     * incrementPlayerStats will overwrite it with the real name on its next upsert.
+     */
+    public void addLifetimeReward(UUID uuid, double moneyAmount) {
+        String sql = """
+                INSERT INTO player_tournament_stats (player_uuid, player_name, lifetime_rewards_money)
+                VALUES (?, ?, ?)
+                ON CONFLICT(player_uuid) DO UPDATE SET
+                    lifetime_rewards_money = lifetime_rewards_money + excluded.lifetime_rewards_money
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, uuid.toString());
+            ps.setDouble(3, moneyAmount);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.severe("Failed to add lifetime reward for " + uuid + ": " + e.getMessage());
         }
     }
 }

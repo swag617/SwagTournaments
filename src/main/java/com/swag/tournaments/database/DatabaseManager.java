@@ -88,6 +88,29 @@ public class DatabaseManager {
                         first_seen INTEGER
                     )
                     """);
+
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS player_type_stats (
+                        player_uuid TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        entered INTEGER DEFAULT 0,
+                        won INTEGER DEFAULT 0,
+                        first_places INTEGER DEFAULT 0,
+                        second_places INTEGER DEFAULT 0,
+                        third_places INTEGER DEFAULT 0,
+                        best_score REAL DEFAULT 0,
+                        PRIMARY KEY (player_uuid, type)
+                    )
+                    """);
+        }
+
+        // Migrations: add columns that may not exist on databases created before this feature
+        // (Personal Profile Card). Mirrors the try-ALTER/catch-and-swallow idiom used by sibling
+        // Swag plugins (e.g. SwagFishing's DatabaseManager) for adding columns to existing tables.
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE player_tournament_stats ADD COLUMN lifetime_rewards_money REAL DEFAULT 0");
+        } catch (SQLException ignored) {
+            // Column already exists
         }
     }
 

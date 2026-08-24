@@ -21,7 +21,7 @@ import java.util.*;
 @SuppressWarnings("deprecation")
 public class TournamentCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBS = List.of("info", "top", "history", "stats", "next");
+    private static final List<String> SUBS = List.of("info", "top", "history", "stats", "next", "profile");
     private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("EEE MM/dd HH:mm");
 
     private final SwagTournaments plugin;
@@ -57,8 +57,9 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             case "history" -> handleHistory(player);
             case "stats" -> handleStats(player, args);
             case "next" -> handleNext(player);
+            case "profile" -> handleProfile(player, args);
             default -> {
-                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next]");
+                player.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Unknown subcommand. Usage: /tournament [info|top|history|stats|next|profile]");
             }
         }
         return true;
@@ -158,6 +159,21 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         });
     }
 
+    private void handleProfile(Player player, String[] args) {
+        OfflinePlayer target;
+
+        if (args.length >= 2) {
+            @SuppressWarnings("deprecation")
+            OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
+            target = op;
+        } else {
+            target = player;
+        }
+
+        PlayerProfileGUI gui = new PlayerProfileGUI(plugin, player, guiListener, target);
+        gui.openAsync();
+    }
+
     private void handleNext(Player player) {
         SchedulerManager scheduler = plugin.getSchedulerManager();
         if (scheduler == null) {
@@ -196,7 +212,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
                     .filter(id -> id.startsWith(args[1].toLowerCase()))
                     .toList();
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("stats")) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("stats") || args[0].equalsIgnoreCase("profile"))) {
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))

@@ -85,6 +85,12 @@ public class RewardManager {
                 // Player offline — deposit by name (Vault supports this)
                 economy.depositPlayer(Bukkit.getOfflinePlayer(p.getPlayerUuid()), tier.getMoney());
             }
+
+            // Only actual money grants count toward the lifetime-rewards total shown on the
+            // profile card — items/commands aren't reliably convertible to a dollar figure.
+            double moneyGranted = tier.getMoney();
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
+                    repository.addLifetimeReward(p.getPlayerUuid(), moneyGranted));
         }
 
         for (String cmd : tier.getCommands()) {

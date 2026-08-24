@@ -18,7 +18,7 @@ softdepend:
 commands:
   tournament:
     description: Player tournament commands
-    usage: /<command> [info|top|history|stats|next]
+    usage: /<command> [info|top|history|stats|next|profile]
     aliases: [t, tourney]
     permission: swagtournaments.use
   tournamentadmin:
