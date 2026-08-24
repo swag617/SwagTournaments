@@ -41,6 +41,7 @@ public class SchedulerManager {
 
     private long lastFiredEpochMinute = -1;
     private LocalDateTime nextAutoStartAt;
+    private TournamentTemplate nextAutoTemplate;
 
     private final Random random = new Random();
 
@@ -61,11 +62,7 @@ public class SchedulerManager {
         // Per-minute cron check (every 20 ticks = 1 second; check every 60 ticks for responsiveness)
         cronTask = Bukkit.getScheduler().runTaskTimer(plugin, this::cronTick, 60L, 60L);
 
-        if (plugin.getConfig().getBoolean("auto-schedule.enabled", false)) {
-            int intervalMinutes = plugin.getConfig().getInt("auto-schedule.interval-minutes", 180);
-            scheduleNextAuto(intervalMinutes);
-            autoTask = Bukkit.getScheduler().runTaskTimer(plugin, this::autoTick, 1200L, 1200L);
-        }
+        syncAutoTask();
 
         log.info("SchedulerManager started with " + slots.size() + " cron slot(s).");
     }
@@ -78,6 +75,29 @@ public class SchedulerManager {
         if (autoTask != null) {
             autoTask.cancel();
             autoTask = null;
+        }
+    }
+
+    /**
+     * Starts or stops the auto-rotation task to match the current "auto-schedule.enabled"
+     * config value. Safe to call repeatedly and from any runtime mutation path (web toggle,
+     * template create/update/delete, /tadmin reload) — a no-op if the task is already in the
+     * correct state. Without this, flipping the toggle at runtime had no effect until a full
+     * server restart because autoTask was only ever created once, inside start().
+     */
+    public void syncAutoTask() {
+        boolean enabled = plugin.getConfig().getBoolean("auto-schedule.enabled", false);
+        if (enabled && autoTask == null) {
+            int intervalMinutes = plugin.getConfig().getInt("auto-schedule.interval-minutes", 180);
+            scheduleNextAuto(intervalMinutes);
+            autoTask = Bukkit.getScheduler().runTaskTimer(plugin, this::autoTick, 1200L, 1200L);
+            log.info("SchedulerManager: auto-rotation enabled.");
+        } else if (!enabled && autoTask != null) {
+            autoTask.cancel();
+            autoTask = null;
+            nextAutoStartAt = null;
+            nextAutoTemplate = null;
+            log.info("SchedulerManager: auto-rotation disabled.");
         }
     }
 
@@ -159,7 +179,7 @@ public class SchedulerManager {
             return;
         }
 
-        TournamentTemplate picked = pickWeightedRandom();
+        TournamentTemplate picked = nextAutoTemplate;
         if (picked == null) {
             log.warning("Auto-rotation: no templates in rotation pool.");
             scheduleNextAuto(plugin.getConfig().getInt("auto-schedule.interval-minutes", 180));
@@ -184,23 +204,30 @@ public class SchedulerManager {
 
     private void scheduleNextAuto(int intervalMinutes) {
         nextAutoStartAt = LocalDateTime.now().plusMinutes(intervalMinutes);
+        // Pick the template ONCE here and carry the same reference through to the actual
+        // start in autoTick() — previously the warning broadcast and the real start each
+        // independently re-rolled pickWeightedRandom(), so players could see "Tournament X
+        // begins in 5m!" and then watch Tournament Y actually start.
+        nextAutoTemplate = pickWeightedRandom();
 
         // Warn players before auto-rotation
         int warningMinutes = plugin.getConfig().getInt("auto-schedule.warning-minutes", 5);
-        if (intervalMinutes > warningMinutes) {
+        if (intervalMinutes > warningMinutes && nextAutoTemplate != null) {
             long warningTicks = (long) (intervalMinutes - warningMinutes) * 60 * 20;
+            TournamentTemplate warnTemplate = nextAutoTemplate;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                // Only warn if auto task hasn't been cancelled
+                // Only warn if auto task hasn't been cancelled, and this pick is still the
+                // one scheduled to fire (a reschedule in between — e.g. FISHING overlap skip,
+                // empty pool retry — would have replaced nextAutoTemplate with a fresh pick).
                 if (autoTask == null) return;
-                TournamentTemplate next = pickWeightedRandom();
-                if (next == null) return;
+                if (nextAutoTemplate != warnTemplate) return;
                 String msg = ChatColor.translateAlternateColorCodes('&',
-                        next.getMessageWarning().isEmpty()
-                                ? "&6★ A &e" + next.getType().name()
+                        warnTemplate.getMessageWarning().isEmpty()
+                                ? "&6★ A &e" + warnTemplate.getType().name()
                                 + "&6 tournament begins in &e" + warningMinutes + "m&6!"
-                                : next.getMessageWarning()
+                                : warnTemplate.getMessageWarning()
                                 .replace("{time}", warningMinutes + "m")
-                                .replace("{type}", next.getType().name()));
+                                .replace("{type}", warnTemplate.getType().name()));
                 Bukkit.broadcastMessage(msg);
             }, warningTicks);
         }
@@ -266,9 +293,11 @@ public class SchedulerManager {
             }
         }
 
-        // Also consider auto-rotation if active
+        // Also consider auto-rotation if active — reuse the already-picked template rather
+        // than re-rolling pickWeightedRandom() again, so this reported "next" template matches
+        // what will actually fire (and what the warning broadcast announced).
         if (nextAutoStartAt != null && nextAutoStartAt.isAfter(now)) {
-            TournamentTemplate auto = pickWeightedRandom();
+            TournamentTemplate auto = nextAutoTemplate;
             if (auto != null) {
                 if (earliest == null || nextAutoStartAt.isBefore(earliest.fireTime())) {
                     earliest = new NextSchedule(auto, nextAutoStartAt);

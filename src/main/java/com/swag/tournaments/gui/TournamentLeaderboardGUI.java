@@ -45,7 +45,7 @@ public class TournamentLeaderboardGUI extends GUIBase {
         String title = ChatColor.DARK_AQUA + "" + ChatColor.BOLD + "Leaderboard";
         if (isActive) {
             long rem = active.getTimeRemainingSeconds();
-            title = ChatColor.GOLD + "" + ChatColor.BOLD + template.getDisplayName()
+            title = ChatColor.GOLD + "" + ChatColor.BOLD + template.getFormattedDisplayName()
                     + ChatColor.YELLOW + " — " + formatTime(rem);
         }
         inventory = Bukkit.createInventory(null, 54, title);

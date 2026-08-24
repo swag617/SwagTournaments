@@ -113,9 +113,11 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
                     + plugin.getTemplateManager().getTemplates().size() + " loaded.");
         }
 
-        // Rebuild scheduler cron slots from fresh templates
+        // Rebuild scheduler cron slots from fresh templates and re-sync the auto-rotation
+        // task in case reloaded config picked up a changed auto-schedule.enabled value
         if (plugin.getSchedulerManager() != null) {
             plugin.getSchedulerManager().rebuildSlots();
+            plugin.getSchedulerManager().syncAutoTask();
         }
     }
 

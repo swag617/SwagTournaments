@@ -114,6 +114,7 @@ public class ScheduleAPIHandler implements HttpHandler {
 
                 if (plugin.getSchedulerManager() != null) {
                     plugin.getSchedulerManager().rebuildSlots();
+                    plugin.getSchedulerManager().syncAutoTask();
                 }
             } finally {
                 latch.countDown();

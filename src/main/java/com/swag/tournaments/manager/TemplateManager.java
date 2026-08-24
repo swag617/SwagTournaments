@@ -5,7 +5,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -77,70 +76,6 @@ public class TemplateManager {
             log.severe("Failed to load template '" + id + "': " + e.getMessage());
             return null;
         }
-    }
-
-    public void saveTemplate(TournamentTemplate template) throws IOException {
-        File file = new File(tournamentsFolder, template.getId() + ".yml");
-        YamlConfiguration config = new YamlConfiguration();
-
-        config.set("id", template.getId());
-        config.set("display-name", template.getDisplayName());
-        config.set("description", template.getDescription());
-        config.set("icon-material", template.getIconMaterial().name());
-        config.set("bar-color", template.getBarColor().name());
-        config.set("bar-style", template.getBarStyle().name());
-        config.set("type", template.getType().name());
-        config.set("scoring-mode", template.getScoringMode().name());
-        config.set("score-formula", template.getScoreFormula());
-        config.set("target-score", template.getTargetScore());
-        config.set("farming-actions", template.getFarmingActions());
-        config.set("mining-materials", template.getMiningMaterials());
-        config.set("combat-entities", template.getCombatEntities());
-
-        config.set("conditions.biomes", template.getConditionBiomes());
-        config.set("conditions.worlds", template.getConditionWorlds());
-        config.set("conditions.time", template.getConditionTime());
-        config.set("conditions.weather", template.getConditionWeather());
-        config.set("conditions.min-y", template.getConditionMinY());
-        config.set("conditions.max-y", template.getConditionMaxY());
-        config.set("conditions.required-permission", template.getConditionRequiredPermission());
-
-        config.set("schedule.in-rotation", template.isInRotation());
-        config.set("schedule.rotation-weight", template.getRotationWeight());
-
-        List<Map<String, Object>> slots = new ArrayList<>();
-        for (var slot : template.getCronSlots()) {
-            Map<String, Object> slotMap = new LinkedHashMap<>();
-            slotMap.put("day", slot.getDay() == null ? "DAILY" : slot.getDay().name());
-            slotMap.put("time", slot.getTime().toString());
-            slotMap.put("duration", slot.getDurationMinutes());
-            slots.add(slotMap);
-        }
-        config.set("schedule.slots", slots);
-
-        config.set("messages.start", template.getMessageStart());
-        config.set("messages.end", template.getMessageEnd());
-        config.set("messages.warning", template.getMessageWarning());
-
-        for (Map.Entry<Integer, com.swag.tournaments.model.RewardTier> entry : template.getRewards().entrySet()) {
-            String key = entry.getKey() == 0 ? "rewards.participation" : "rewards." + entry.getKey();
-            var tier = entry.getValue();
-            config.set(key + ".money", tier.getMoney());
-            config.set(key + ".commands", tier.getCommands());
-            if (entry.getKey() == 0) config.set(key + ".enabled", true);
-        }
-
-        config.set("integration.defer-to-swagfishing", template.isDeferToSwagFishing());
-        config.set("integration.defer-to-swagfarming", template.isDeferToSwagFarming());
-        config.set("integration.discord-channel-key", template.getDiscordChannelKey());
-
-        config.set("cosmetics.start-fireworks", template.isStartFireworks());
-        config.set("cosmetics.end-fireworks", template.isEndFireworks());
-        config.set("cosmetics.sound-start", template.getSoundStart());
-        config.set("cosmetics.sound-end", template.getSoundEnd());
-
-        config.save(file);
-        templates.put(template.getId(), template);
     }
 
     public void deleteTemplate(String id) {

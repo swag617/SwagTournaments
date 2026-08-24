@@ -151,6 +151,7 @@ public class TemplateAPIHandler implements HttpHandler {
             plugin.getTemplateManager().deleteTemplate(id);
             if (plugin.getSchedulerManager() != null) {
                 plugin.getSchedulerManager().rebuildSlots();
+                plugin.getSchedulerManager().syncAutoTask();
             }
             latch.countDown();
         });
@@ -239,6 +240,28 @@ public class TemplateAPIHandler implements HttpHandler {
                     for (JsonElement c : tier.getAsJsonArray("commands")) cmds.add(c.getAsString());
                 }
                 cfg.set(yamlKey + ".commands", cmds);
+
+                // Only write "items" when the incoming JSON actually included it for this tier.
+                // The web UI has no items editor yet and never sends the key at all — if we wrote
+                // an empty list here on every save, that would silently wipe out hand-authored
+                // item rewards already on disk (see diamond_rush.yml etc). Leave whatever is
+                // already present in cfg (loaded from the existing file above) untouched instead.
+                if (tier.has("items") && tier.get("items").isJsonArray()) {
+                    List<Map<String, Object>> items = new ArrayList<>();
+                    for (JsonElement ie : tier.getAsJsonArray("items")) {
+                        if (!ie.isJsonObject()) continue;
+                        JsonObject itemObj = ie.getAsJsonObject();
+                        Map<String, Object> itemMap = new LinkedHashMap<>();
+                        itemMap.put("material", getString(itemObj, "material", "STONE"));
+                        itemMap.put("amount", getIntFromObj(itemObj, "amount", 1));
+                        if (itemObj.has("display-name") && !itemObj.get("display-name").isJsonNull()) {
+                            itemMap.put("display-name", itemObj.get("display-name").getAsString());
+                        }
+                        items.add(itemMap);
+                    }
+                    cfg.set(yamlKey + ".items", items);
+                }
+
                 if (key.equals("participation")) {
                     cfg.set(yamlKey + ".enabled", getBoolFromObj(tier, "enabled", false));
                 }
@@ -269,6 +292,7 @@ public class TemplateAPIHandler implements HttpHandler {
             plugin.getTemplateManager().reloadTemplate(id);
             if (plugin.getSchedulerManager() != null) {
                 plugin.getSchedulerManager().rebuildSlots();
+                plugin.getSchedulerManager().syncAutoTask();
             }
             latch.countDown();
         });
@@ -335,6 +359,7 @@ public class TemplateAPIHandler implements HttpHandler {
             JsonObject tier = new JsonObject();
             tier.addProperty("money", entry.getValue().getMoney());
             tier.add("commands", strListToJson(entry.getValue().getCommands()));
+            tier.add("items", itemsToJson(entry.getValue().getItems()));
             if (entry.getKey() == 0) tier.addProperty("enabled", true);
             rewards.add(key, tier);
         }
@@ -359,6 +384,29 @@ public class TemplateAPIHandler implements HttpHandler {
     private JsonArray strListToJson(List<String> list) {
         JsonArray arr = new JsonArray();
         for (String s : list) arr.add(s);
+        return arr;
+    }
+
+    /**
+     * Serializes reward-tier ItemStacks back into the same {material, amount, display-name}
+     * shape writeTemplateFromJson()/TournamentTemplate#fromConfig() read from the YAML "items"
+     * list, so the web editor round-trips item rewards instead of silently losing them.
+     * Display names are un-translated back from '&sect;' to '&' to match how every other
+     * raw-string field (display-name, messages.*) is kept literal for round-tripping.
+     */
+    private JsonArray itemsToJson(List<org.bukkit.inventory.ItemStack> items) {
+        JsonArray arr = new JsonArray();
+        for (org.bukkit.inventory.ItemStack stack : items) {
+            if (stack == null) continue;
+            JsonObject itemObj = new JsonObject();
+            itemObj.addProperty("material", stack.getType().name());
+            itemObj.addProperty("amount", stack.getAmount());
+            if (stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()) {
+                itemObj.addProperty("display-name",
+                        stack.getItemMeta().getDisplayName().replace(org.bukkit.ChatColor.COLOR_CHAR, '&'));
+            }
+            arr.add(itemObj);
+        }
         return arr;
     }
 
