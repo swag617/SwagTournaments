@@ -89,7 +89,7 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
         boolean started = plugin.getTournamentManager().startTournament(template, duration, "ADMIN");
         if (started) {
             sender.sendMessage(plugin.getChatPrefix() + ChatColor.GREEN + "Tournament '"
-                    + template.getDisplayName() + "' started for " + duration + " minutes.");
+                    + template.getFormattedDisplayName() + "' started for " + duration + " minutes.");
         } else {
             sender.sendMessage(plugin.getChatPrefix() + ChatColor.RED + "Could not start — another tournament may be active.");
         }
@@ -135,7 +135,7 @@ public class TournamentAdminCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(statusTag + ChatColor.WHITE + " " + t.getId()
                     + ChatColor.GRAY + " | " + t.getType().name()
                     + " | " + t.getScoringMode().name()
-                    + ChatColor.DARK_GRAY + " — " + t.getDisplayName());
+                    + ChatColor.DARK_GRAY + " — " + t.getFormattedDisplayName());
         }
     }
 

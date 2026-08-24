@@ -1,5 +1,6 @@
 package com.swag.tournaments.model;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -271,7 +272,16 @@ public final class TournamentTemplate {
     // ---- Getters ----
 
     public String getId() { return id; }
+
+    /** Raw config value (literal '&amp;' codes) — keep untranslated for round-tripping through
+     *  config.yml saves and the web-editor JSON API. Use {@link #getFormattedDisplayName()} for
+     *  anything actually shown to a player (boss bar, chat messages). */
     public String getDisplayName() { return displayName; }
+
+    /** {@link #getDisplayName()} with '&amp;' color codes translated — use this for boss bars,
+     *  broadcasts, and command output. Not cached: translating a short string is cheap even at the
+     *  once-per-second rate the boss-bar title updater calls this at. */
+    public String getFormattedDisplayName() { return ChatColor.translateAlternateColorCodes('&', displayName); }
     public String getDescription() { return description; }
     public Material getIconMaterial() { return iconMaterial; }
     public BarColor getBarColor() { return barColor; }

@@ -156,7 +156,7 @@ public class AdminPanelGUI extends GUIBase {
                             .startTournament(template, 30, "ADMIN");
                     if (started) {
                         player.sendMessage(ChatColor.GREEN + "Tournament '"
-                                + template.getDisplayName() + "' started for 30 minutes.");
+                                + template.getFormattedDisplayName() + "' started for 30 minutes.");
                         player.closeInventory();
                     } else {
                         player.sendMessage(ChatColor.RED

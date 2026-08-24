@@ -177,7 +177,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
                         .toInstant().toEpochMilli()));
 
         player.sendMessage(plugin.getChatPrefix() + ChatColor.GOLD + "Next Tournament: "
-                + ChatColor.YELLOW + ns.template().getDisplayName()
+                + ChatColor.YELLOW + ns.template().getFormattedDisplayName()
                 + ChatColor.GRAY + " at " + ChatColor.WHITE + when
                 + ChatColor.GRAY + " (" + ns.template().getType().name() + ")");
     }

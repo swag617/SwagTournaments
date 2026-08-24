@@ -118,7 +118,7 @@ public class TournamentManager {
             long rem = instance.getTimeRemainingSeconds();
             float progress = (float) rem / (durationMinutes * 60);
             bar.setProgress(Math.max(0.0f, Math.min(1.0f, progress)));
-            bar.setTitle(ChatColor.GOLD + template.getDisplayName()
+            bar.setTitle(ChatColor.GOLD + template.getFormattedDisplayName()
                     + ChatColor.YELLOW + " — " + formatTime(rem));
         }, 20L, 20L);
 
@@ -314,7 +314,7 @@ public class TournamentManager {
 
     private BossBar createBossBar(TournamentTemplate template, int durationMinutes) {
         BossBar bar = Bukkit.createBossBar(
-                ChatColor.GOLD + template.getDisplayName()
+                ChatColor.GOLD + template.getFormattedDisplayName()
                         + ChatColor.YELLOW + " — " + durationMinutes + "m",
                 template.getBarColor(),
                 template.getBarStyle()
@@ -332,7 +332,7 @@ public class TournamentManager {
         return ChatColor.translateAlternateColorCodes('&', msg)
                 .replace("{duration}", String.valueOf(durationMinutes))
                 .replace("{type}", template.getType().name())
-                .replace("{name}", template.getDisplayName());
+                .replace("{name}", template.getFormattedDisplayName());
     }
 
     private void broadcastResults(TournamentTemplate template, List<TournamentParticipant> ranked) {
