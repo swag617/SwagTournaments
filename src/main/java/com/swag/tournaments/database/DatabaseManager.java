@@ -56,9 +56,23 @@ public class DatabaseManager {
                         winner_uuid TEXT,
                         winner_score REAL,
                         participant_count INTEGER DEFAULT 0,
-                        source TEXT DEFAULT 'MANUAL'
+                        source TEXT DEFAULT 'MANUAL',
+                        type TEXT
                     )
                     """);
+
+            // Defensive migration: tournament_instances may already exist (without this
+            // column) on servers upgrading from before category filtering was added to
+            // /tournament history — see PastTournamentsGUI's filter row and
+            // TournamentRepository#getHistory's optional type filter. There's no migration
+            // framework in this codebase yet, so ALTER TABLE ADD COLUMN is added directly to
+            // CREATE TABLE IF NOT EXISTS above (fresh installs) and attempted unconditionally
+            // here too, swallowing the failure when the column already exists.
+            try {
+                stmt.execute("ALTER TABLE tournament_instances ADD COLUMN type TEXT");
+            } catch (SQLException ignored) {
+                // Column already exists.
+            }
 
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS tournament_scores (

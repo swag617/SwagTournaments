@@ -1,6 +1,7 @@
 package com.swag.tournaments.web.handlers;
 
 import com.swag.tournaments.SwagTournaments;
+import com.swag.tournaments.model.TournamentType;
 import com.swag.tournaments.web.JsonUtil;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -45,6 +46,7 @@ public class HistoryAPIHandler implements HttpHandler {
     private void handleList(HttpExchange ex, String query) throws IOException {
         int page = 0;
         int size = 20;
+        TournamentType type = null;
 
         if (query != null) {
             for (String param : query.split("&")) {
@@ -53,6 +55,14 @@ public class HistoryAPIHandler implements HttpHandler {
                     try {
                         if (kv[0].equals("page")) page = Integer.parseInt(kv[1]);
                         if (kv[0].equals("size")) size = Math.min(Integer.parseInt(kv[1]), 100);
+                        if (kv[0].equals("type")) {
+                            try {
+                                type = TournamentType.valueOf(kv[1].toUpperCase());
+                            } catch (IllegalArgumentException ignored) {
+                                // Unknown/malformed type — fall through with no filter rather
+                                // than erroring the whole request.
+                            }
+                        }
                     } catch (NumberFormatException ignored) {}
                 }
             }
@@ -60,11 +70,12 @@ public class HistoryAPIHandler implements HttpHandler {
 
         int finalPage = page;
         int finalSize = size;
+        TournamentType finalType = type;
         AtomicReference<List<Map<String, Object>>> result = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            result.set(plugin.getTournamentRepository().getHistory(finalPage, finalSize));
+            result.set(plugin.getTournamentRepository().getHistory(finalPage, finalSize, finalType));
             latch.countDown();
         });
 

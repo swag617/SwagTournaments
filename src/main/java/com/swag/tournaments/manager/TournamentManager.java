@@ -74,7 +74,7 @@ public class TournamentManager {
 
         // Insert DB row async, then set instanceId back on main thread
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            long id = repository.insertInstance(template.getId(), startedAt, source);
+            long id = repository.insertInstance(template.getId(), startedAt, source, template.getType());
             Bukkit.getScheduler().runTask(plugin, () -> instance.setInstanceId(id));
         });
 

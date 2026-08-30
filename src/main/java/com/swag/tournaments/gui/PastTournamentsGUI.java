@@ -2,6 +2,7 @@ package com.swag.tournaments.gui;
 
 import com.swag.tournaments.SwagTournaments;
 import com.swag.tournaments.database.TournamentRepository;
+import com.swag.tournaments.model.TournamentType;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -22,24 +23,37 @@ public class PastTournamentsGUI extends GUIBase {
     private static final int PAGE_SIZE = 28;
     private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("MM/dd/yy HH:mm");
 
+    // Category filter row — row 0 (slots 0-8), which fillBorder() otherwise leaves as plain
+    // unused border glass. One slot per TournamentType, in declaration order. Click to filter
+    // to that category, click the same one again to clear (mirrors ShopGUI's rarity-filter
+    // row in SwagFarming — the established toggle-filter convention in this ecosystem).
+    private static final int[] FILTER_SLOTS = {1, 2, 3, 4, 5, 6};
+
     private final SwagTournaments plugin;
     private final Player player;
     private final GUIListener guiListener;
     private int page;
+    private final TournamentType filter;
 
     // Loaded async then set on main thread before opening
     private List<Map<String, Object>> rows = new ArrayList<>();
     private int totalRows = 0;
 
     public PastTournamentsGUI(SwagTournaments plugin, Player player, GUIListener guiListener) {
-        this(plugin, player, guiListener, 0);
+        this(plugin, player, guiListener, 0, null);
     }
 
     public PastTournamentsGUI(SwagTournaments plugin, Player player, GUIListener guiListener, int page) {
+        this(plugin, player, guiListener, page, null);
+    }
+
+    public PastTournamentsGUI(SwagTournaments plugin, Player player, GUIListener guiListener,
+                               int page, TournamentType filter) {
         this.plugin = plugin;
         this.player = player;
         this.guiListener = guiListener;
         this.page = page;
+        this.filter = filter;
     }
 
     /**
@@ -49,9 +63,10 @@ public class PastTournamentsGUI extends GUIBase {
     public void openAsync() {
         TournamentRepository repo = plugin.getTournamentRepository();
         int currentPage = page;
+        TournamentType currentFilter = filter;
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            List<Map<String, Object>> data = repo.getHistory(currentPage, PAGE_SIZE);
+            List<Map<String, Object>> data = repo.getHistory(currentPage, PAGE_SIZE, currentFilter);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 this.rows = data;
                 guiListener.register(player, this);
@@ -67,6 +82,17 @@ public class PastTournamentsGUI extends GUIBase {
 
         fillBorder(Material.GRAY_STAINED_GLASS_PANE);
 
+        // Category filter row (overwrites the plain border glass fillBorder() just placed
+        // in row 0 at these specific slots).
+        TournamentType[] types = TournamentType.values();
+        for (int i = 0; i < Math.min(types.length, FILTER_SLOTS.length); i++) {
+            TournamentType t = types[i];
+            boolean selected = t == filter;
+            setItem(FILTER_SLOTS[i], createItem(filterMaterial(t),
+                    (selected ? "&a[" : "&7") + capitalize(t.name()) + (selected ? "&a]" : ""),
+                    "&7Click to filter by " + capitalize(t.name()).toLowerCase()));
+        }
+
         // Content slots: rows 1-4, columns 1-7 (slots 10-16, 19-25, 28-34, 37-43)
         int[] contentSlots = buildContentSlots();
 
@@ -76,7 +102,9 @@ public class PastTournamentsGUI extends GUIBase {
         }
 
         if (rows.isEmpty()) {
-            setItem(22, createItem(Material.PAPER, "&7No past tournaments", "&8None recorded yet"));
+            setItem(22, createItem(Material.PAPER, "&7No past tournaments",
+                    filter != null ? "&8None recorded yet for " + capitalize(filter.name())
+                                   : "&8None recorded yet"));
         }
 
         // Navigation
@@ -87,6 +115,22 @@ public class PastTournamentsGUI extends GUIBase {
         if (rows.size() == PAGE_SIZE) {
             setItem(53, createItem(Material.ARROW, "&eNext Page"));
         }
+    }
+
+    private Material filterMaterial(TournamentType type) {
+        return switch (type) {
+            case FISHING -> Material.FISHING_ROD;
+            case FARMING -> Material.WHEAT;
+            case COMBAT -> Material.DIAMOND_SWORD;
+            case MINING -> Material.DIAMOND_PICKAXE;
+            case ECONOMY -> Material.GOLD_INGOT;
+            case CUSTOM -> Material.NETHER_STAR;
+        };
+    }
+
+    private String capitalize(String s) {
+        if (s.isEmpty()) return s;
+        return s.charAt(0) + s.substring(1).toLowerCase();
     }
 
     private int[] buildContentSlots() {
@@ -157,8 +201,7 @@ public class PastTournamentsGUI extends GUIBase {
         int slot = event.getRawSlot();
 
         if (slot == 45 && page > 0) {
-            page--;
-            PastTournamentsGUI newGui = new PastTournamentsGUI(plugin, player, guiListener, page);
+            PastTournamentsGUI newGui = new PastTournamentsGUI(plugin, player, guiListener, page - 1, filter);
             newGui.openAsync();
             return;
         }
@@ -167,9 +210,22 @@ public class PastTournamentsGUI extends GUIBase {
             return;
         }
         if (slot == 53 && rows.size() == PAGE_SIZE) {
-            page++;
-            PastTournamentsGUI newGui = new PastTournamentsGUI(plugin, player, guiListener, page);
+            PastTournamentsGUI newGui = new PastTournamentsGUI(plugin, player, guiListener, page + 1, filter);
             newGui.openAsync();
+            return;
+        }
+
+        // Category filter row — mirrors ShopGUI's rarity-filter toggle exactly: clicking the
+        // already-selected category clears it back to "All", clicking a different one selects
+        // it. Always resets to page 0 since the previous page number may not exist under the
+        // new filter.
+        TournamentType[] types = TournamentType.values();
+        for (int i = 0; i < Math.min(types.length, FILTER_SLOTS.length); i++) {
+            if (slot != FILTER_SLOTS[i]) continue;
+            TournamentType newFilter = (types[i] == filter) ? null : types[i];
+            PastTournamentsGUI newGui = new PastTournamentsGUI(plugin, player, guiListener, 0, newFilter);
+            newGui.openAsync();
+            return;
         }
     }
 

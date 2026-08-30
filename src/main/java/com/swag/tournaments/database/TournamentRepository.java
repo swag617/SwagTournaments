@@ -19,13 +19,18 @@ public class TournamentRepository {
         this.log = log;
     }
 
-    public long insertInstance(String templateId, long startedAt, String source) {
-        String sql = "INSERT INTO tournament_instances (template_id, status, started_at, source) VALUES (?, ?, ?, ?)";
+    public long insertInstance(String templateId, long startedAt, String source, TournamentType type) {
+        // "type" is denormalized onto the instance row (rather than resolved via a join to
+        // whatever template config is currently loaded) specifically so /tournament history's
+        // category filter (see PastTournamentsGUI) keeps working correctly for old instances
+        // even after a template is renamed/retyped/deleted later.
+        String sql = "INSERT INTO tournament_instances (template_id, status, started_at, source, type) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement ps = db.getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, templateId);
             ps.setString(2, TournamentStatus.ACTIVE.name());
             ps.setLong(3, startedAt);
             ps.setString(4, source);
+            ps.setString(5, type != null ? type.name() : null);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) return rs.getLong(1);
@@ -103,17 +108,32 @@ public class TournamentRepository {
     }
 
     public List<Map<String, Object>> getHistory(int page, int pageSize) {
+        return getHistory(page, pageSize, null);
+    }
+
+    /**
+     * @param typeFilter when non-null, restricts results to instances of that
+     *                   {@link TournamentType} — backs /tournament history's per-category
+     *                   filter (Fishing/Farming/Mining/Combat/Economy/Custom — see
+     *                   PastTournamentsGUI). Instances started before the {@code type} column
+     *                   existed have it NULL and simply won't match any specific filter (they
+     *                   still show up in the unfiltered "All" view).
+     */
+    public List<Map<String, Object>> getHistory(int page, int pageSize, TournamentType typeFilter) {
         String sql = """
                 SELECT i.id, i.template_id, i.status, i.started_at, i.ended_at,
-                       i.winner_uuid, i.winner_score, i.participant_count, i.source
+                       i.winner_uuid, i.winner_score, i.participant_count, i.source, i.type
                 FROM tournament_instances i
+                %s
                 ORDER BY i.started_at DESC
                 LIMIT ? OFFSET ?
-                """;
+                """.formatted(typeFilter != null ? "WHERE i.type = ?" : "");
         List<Map<String, Object>> results = new ArrayList<>();
         try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setInt(1, pageSize);
-            ps.setInt(2, page * pageSize);
+            int idx = 1;
+            if (typeFilter != null) ps.setString(idx++, typeFilter.name());
+            ps.setInt(idx++, pageSize);
+            ps.setInt(idx, page * pageSize);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> row = new LinkedHashMap<>();
@@ -126,6 +146,7 @@ public class TournamentRepository {
                     row.put("winner_score", rs.getDouble("winner_score"));
                     row.put("participant_count", rs.getInt("participant_count"));
                     row.put("source", rs.getString("source"));
+                    row.put("type", rs.getString("type"));
                     results.add(row);
                 }
             }
