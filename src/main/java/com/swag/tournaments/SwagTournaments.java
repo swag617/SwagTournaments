@@ -1,5 +1,6 @@
 package com.swag.tournaments;
 
+import com.SwagDev.SwagAPI.api.IConfigMigrationService;
 import com.SwagDev.SwagAPI.api.IPrefixService;
 import com.swag.tournaments.commands.TournamentAdminCommand;
 import com.swag.tournaments.commands.TournamentCommand;
@@ -57,6 +58,21 @@ public class SwagTournaments extends JavaPlugin {
         // 1. Config
         saveDefaultConfig();
 
+        // 1a. Merge any config keys added in a plugin update into an existing on-disk
+        // config.yml (saveDefaultConfig() above only ever writes the bundled default once, on a
+        // genuinely fresh install). messages.yml is deliberately NOT run through this — it's
+        // read straight out of the jar resource (see loadConfiguredPrefixFromMessagesYml()
+        // below), never copied to disk, so there's no on-disk file to migrate. The bundled
+        // tournament templates under tournaments/ are likewise skipped: TemplateManager already
+        // copies each one to disk only if missing, file-by-file — they're user-owned template
+        // definitions, not flat settings, so merging keys back into one an admin edited isn't
+        // appropriate (the same reasoning SwagRestartScheduler documents for its schedules.yml).
+        ServicesManager earlySm = getServer().getServicesManager();
+        var cfgMigProvider = earlySm.getRegistration(IConfigMigrationService.class);
+        if (cfgMigProvider != null) {
+            cfgMigProvider.getProvider().migrate(this);
+        }
+
         // 1b. Chat prefix — resolve SwagAPI's IPrefixService (per-plugin or global admin
         // override from the web panel) once at startup, falling back to this plugin's own
         // messages.yml "prefix" value unchanged if SwagAPI/the service isn't present or
@@ -110,6 +126,11 @@ public class SwagTournaments extends JavaPlugin {
 
         // Wire integration manager back into tournament manager for lifecycle callbacks
         tournamentManager.setIntegrationManager(integrationManager);
+
+        // 8b. Recover a tournament left ACTIVE by an unclean shutdown (crash/force-kill) before
+        // the scheduler starts, so auto-rotation can never race a resume with a fresh start —
+        // see TournamentManager#resumeActiveInstance's javadoc for why this exists at all.
+        tournamentManager.resumeActiveInstance(templateManager);
 
         // 9. SchedulerManager
         schedulerManager = new SchedulerManager(this, templateManager, tournamentManager, integrationManager);
