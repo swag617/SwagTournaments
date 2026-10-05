@@ -57,7 +57,8 @@ public class DatabaseManager {
                         winner_score REAL,
                         participant_count INTEGER DEFAULT 0,
                         source TEXT DEFAULT 'MANUAL',
-                        type TEXT
+                        type TEXT,
+                        duration_minutes INTEGER
                     )
                     """);
 
@@ -70,6 +71,17 @@ public class DatabaseManager {
             // here too, swallowing the failure when the column already exists.
             try {
                 stmt.execute("ALTER TABLE tournament_instances ADD COLUMN type TEXT");
+            } catch (SQLException ignored) {
+                // Column already exists.
+            }
+            try {
+                // Needed to correctly resume (or cleanly finalize) a tournament that was still
+                // ACTIVE when the server stopped uncleanly (crash/force-kill — a graceful
+                // shutdown already flushes and ends it via TournamentManager#shutdownFlush, see
+                // its javadoc) — without the original duration, a resume can't tell how much
+                // time was actually left versus just re-deriving it from the template's CURRENT
+                // default, which drifts if the template's duration was ever edited since.
+                stmt.execute("ALTER TABLE tournament_instances ADD COLUMN duration_minutes INTEGER");
             } catch (SQLException ignored) {
                 // Column already exists.
             }

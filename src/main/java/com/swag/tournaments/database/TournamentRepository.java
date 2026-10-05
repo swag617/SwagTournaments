@@ -19,18 +19,21 @@ public class TournamentRepository {
         this.log = log;
     }
 
-    public long insertInstance(String templateId, long startedAt, String source, TournamentType type) {
+    public long insertInstance(String templateId, long startedAt, String source, TournamentType type, int durationMinutes) {
         // "type" is denormalized onto the instance row (rather than resolved via a join to
         // whatever template config is currently loaded) specifically so /tournament history's
         // category filter (see PastTournamentsGUI) keeps working correctly for old instances
-        // even after a template is renamed/retyped/deleted later.
-        String sql = "INSERT INTO tournament_instances (template_id, status, started_at, source, type) VALUES (?, ?, ?, ?, ?)";
+        // even after a template is renamed/retyped/deleted later. "duration_minutes" is stored
+        // for the same reason, but for TournamentManager#resumeActiveInstance instead — see its
+        // column-level migration comment in DatabaseManager.
+        String sql = "INSERT INTO tournament_instances (template_id, status, started_at, source, type, duration_minutes) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = db.getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, templateId);
             ps.setString(2, TournamentStatus.ACTIVE.name());
             ps.setLong(3, startedAt);
             ps.setString(4, source);
             ps.setString(5, type != null ? type.name() : null);
+            ps.setInt(6, durationMinutes);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) return rs.getLong(1);
@@ -39,6 +42,42 @@ public class TournamentRepository {
             log.severe("Failed to insert tournament instance: " + e.getMessage());
         }
         return -1;
+    }
+
+    /**
+     * Returns the single tournament instance row still marked ACTIVE, if any — meaning the
+     * server stopped uncleanly (crash/force-kill) while it was running, since a graceful
+     * shutdown already finalizes it (see TournamentManager#shutdownFlush). Returns null if none
+     * (the overwhelmingly common case). Used by TournamentManager#resumeActiveInstance at
+     * startup to either resume it (time remaining) or finalize it properly with rewards
+     * distributed (time already elapsed while the server was down), instead of leaving a
+     * permanent zombie "ACTIVE" row that every future /tournament check silently disagrees with.
+     */
+    public Map<String, Object> findActiveInstance() {
+        String sql = """
+                SELECT id, template_id, started_at, source, duration_minutes
+                FROM tournament_instances
+                WHERE status = ?
+                ORDER BY started_at DESC
+                LIMIT 1
+                """;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, TournamentStatus.ACTIVE.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", rs.getLong("id"));
+                row.put("template_id", rs.getString("template_id"));
+                row.put("started_at", rs.getLong("started_at"));
+                row.put("source", rs.getString("source"));
+                int duration = rs.getInt("duration_minutes");
+                row.put("duration_minutes", rs.wasNull() ? null : duration);
+                return row;
+            }
+        } catch (SQLException e) {
+            log.severe("Failed to query for an active tournament instance: " + e.getMessage());
+            return null;
+        }
     }
 
     public void finalizeInstance(long id, long endedAt, String winnerId, double winnerScore,

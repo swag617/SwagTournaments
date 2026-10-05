@@ -74,7 +74,7 @@ public class TournamentManager {
 
         // Insert DB row async, then set instanceId back on main thread
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            long id = repository.insertInstance(template.getId(), startedAt, source, template.getType());
+            long id = repository.insertInstance(template.getId(), startedAt, source, template.getType(), durationMinutes);
             Bukkit.getScheduler().runTask(plugin, () -> instance.setInstanceId(id));
         });
 
@@ -108,19 +108,38 @@ public class TournamentManager {
         long endTicks = (long) durationMinutes * 60 * 20;
         endTask = Bukkit.getScheduler().runTaskLater(plugin, () -> finishTournament(null), endTicks);
 
-        // BossBar countdown updater every second — stored so it can be cancelled on end
-        barTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        // BossBar countdown updater every second — stored so it can be cancelled on end.
+        // BUG FIX: the stale-task self-cancel below must cancel ITS OWN task handle, not the
+        // shared `barTask` field — that field may already point at a newer task by the time a
+        // stale closure fires, which would cancel the wrong (current, legitimate) task and
+        // leave this orphaned one running forever with its BossBar never removed. A one-element
+        // holder captured by the lambda gives it a self-reference to cancel instead.
+        BukkitTask[] barTaskHolder = new BukkitTask[1];
+        barTaskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (currentInstance != instance) {
-                // Stale task — tournament was replaced; self-cancel
-                if (barTask != null) { barTask.cancel(); barTask = null; }
+                // Stale task — tournament was replaced; self-cancel via own handle
+                barTaskHolder[0].cancel();
+                if (barTask == barTaskHolder[0]) barTask = null;
                 return;
             }
             long rem = instance.getTimeRemainingSeconds();
+            // Watchdog: if real time has passed the scheduled end but the one-shot endTask
+            // above was ever missed or silently dropped (e.g. a soft plugin reload that leaves
+            // stale scheduler tasks behind), nothing else would notice — the tournament would
+            // stay ACTIVE forever with this bar frozen at 0:00 instead of ever actually ending.
+            // This tick already runs every second for the countdown anyway, so enforcing the
+            // real deadline here too costs nothing extra (reported: "tournament ended a while
+            // ago but the boss bar is still up and it never actually ends").
+            if (rem <= 0) {
+                finishTournament(null);
+                return;
+            }
             float progress = (float) rem / (durationMinutes * 60);
             bar.setProgress(Math.max(0.0f, Math.min(1.0f, progress)));
             bar.setTitle(ChatColor.GOLD + template.getFormattedDisplayName()
                     + ChatColor.YELLOW + " — " + formatTime(rem));
         }, 20L, 20L);
+        barTask = barTaskHolder[0];
 
         if (integrationManager != null) {
             integrationManager.onTournamentStart(instance);
@@ -267,6 +286,119 @@ public class TournamentManager {
 
     public boolean isActive() {
         return currentInstance != null && currentInstance.getStatus() == TournamentStatus.ACTIVE;
+    }
+
+    /**
+     * Called once at plugin startup — after this manager and {@code templateManager} exist, but
+     * before {@link com.swag.tournaments.manager.SchedulerManager#start()} so auto-rotation can
+     * never race a resume — to recover from an UNCLEAN shutdown (crash, force-kill) that left a
+     * tournament instance row still marked ACTIVE in the database. A graceful shutdown already
+     * finalizes the running tournament via {@link #shutdownFlush()}, so this only ever finds
+     * something to do after a crash — {@code currentInstance} starts {@code null} on every fresh
+     * boot regardless, with nothing to reconcile it against the DB, which was the actual root
+     * cause of "/tournament says none active" after an unclean restart despite one having been
+     * genuinely in progress.
+     *
+     * <p>If the tournament's original time window had already fully elapsed while the server was
+     * down, it's finalized properly right now — participants restored from their persisted
+     * scores, rewards distributed — rather than the crash silently costing whoever was leading
+     * their reward. Otherwise it's resumed in place with the correct remaining time.</p>
+     */
+    public void resumeActiveInstance(com.swag.tournaments.manager.TemplateManager templateManager) {
+        Map<String, Object> row = repository.findActiveInstance();
+        if (row == null) return;
+
+        long instanceId = (Long) row.get("id");
+        String templateId = (String) row.get("template_id");
+        long startedAt = (Long) row.get("started_at");
+        String source = (String) row.get("source");
+        Integer durationMinutes = (Integer) row.get("duration_minutes");
+
+        Optional<TournamentTemplate> templateOpt = templateManager.getTemplate(templateId);
+        if (templateOpt.isEmpty() || durationMinutes == null) {
+            log.warning("Found an ACTIVE tournament instance (id=" + instanceId + ", template='" + templateId
+                    + "') left over from an unclean shutdown, but "
+                    + (templateOpt.isEmpty() ? "its template no longer exists" : "it has no recorded duration")
+                    + " — marking it cancelled instead of resuming.");
+            repository.finalizeInstance(instanceId, System.currentTimeMillis(), null, 0.0, 0, TournamentStatus.CANCELLED);
+            return;
+        }
+        TournamentTemplate template = templateOpt.get();
+
+        ScoringEngine engine = engineRegistry.getEngine(template.getType());
+        if (engine == null) {
+            log.warning("Found an ACTIVE tournament instance (id=" + instanceId + ") for template '" + templateId
+                    + "', but no scoring engine is registered for type " + template.getType() + " — marking it cancelled.");
+            repository.finalizeInstance(instanceId, System.currentTimeMillis(), null, 0.0, 0, TournamentStatus.CANCELLED);
+            return;
+        }
+
+        TournamentInstance instance = new TournamentInstance(template, startedAt, durationMinutes, source);
+        instance.setInstanceId(instanceId);
+
+        // Restore participants from their persisted scores (upsertScore flushes on every
+        // submission during a normal run, so this is complete up to the moment of the crash)
+        // so the leaderboard/rewards reflect everything earned before it, not just whatever
+        // happens to accumulate from this point forward.
+        for (Map<String, Object> p : repository.getParticipants(instanceId)) {
+            try {
+                UUID uuid = UUID.fromString((String) p.get("player_uuid"));
+                String name = (String) p.get("player_name");
+                double score = (double) p.get("score");
+                TournamentParticipant participant = new TournamentParticipant(uuid, name);
+                participant.setScore(score);
+                instance.getParticipants().put(uuid, participant);
+            } catch (Exception e) {
+                log.warning("Skipped a corrupt participant row while resuming tournament instance " + instanceId + ": " + e.getMessage());
+            }
+        }
+
+        engine.onActivate(instance, plugin, (player, delta, metadata) -> submitScore(player, delta, metadata));
+        currentInstance = instance;
+        activeEngine = engine;
+
+        long remainingMs = instance.getScheduledEndAt() - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+            log.info("Tournament '" + templateId + "' (id=" + instanceId + ") had already fully elapsed while "
+                    + "the server was down (unclean shutdown) — finalizing it now with rewards for whoever was leading.");
+            finishTournament(null);
+            return;
+        }
+
+        BossBar bar = createBossBar(template, durationMinutes);
+        instance.setBossBar(bar);
+        for (Player p : Bukkit.getOnlinePlayers()) bar.addPlayer(p);
+
+        long remainingTicks = remainingMs / 50;
+        endTask = Bukkit.getScheduler().runTaskLater(plugin, () -> finishTournament(null), remainingTicks);
+        // Same self-cancel-via-own-handle fix as startTournament's barTask — see its comment.
+        BukkitTask[] barTaskHolder = new BukkitTask[1];
+        barTaskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (currentInstance != instance) {
+                barTaskHolder[0].cancel();
+                if (barTask == barTaskHolder[0]) barTask = null;
+                return;
+            }
+            long rem = instance.getTimeRemainingSeconds();
+            // Watchdog — see startTournament's identical check for why.
+            if (rem <= 0) {
+                finishTournament(null);
+                return;
+            }
+            float progress = (float) rem / (durationMinutes * 60);
+            bar.setProgress(Math.max(0.0f, Math.min(1.0f, progress)));
+            bar.setTitle(ChatColor.GOLD + template.getFormattedDisplayName()
+                    + ChatColor.YELLOW + " — " + formatTime(rem));
+        }, 20L, 20L);
+        barTask = barTaskHolder[0];
+
+        if (integrationManager != null) integrationManager.onTournamentStart(instance);
+
+        log.info("Resumed tournament '" + templateId + "' (id=" + instanceId + ") after an unclean shutdown — "
+                + formatTime(remainingMs / 1000) + " remaining, " + instance.getParticipantCount() + " participant(s) restored.");
+        Bukkit.broadcastMessage(plugin.getChatPrefix() + ChatColor.YELLOW + "The tournament '"
+                + template.getFormattedDisplayName() + "' has resumed after a server restart — "
+                + formatTime(remainingMs / 1000) + " remaining!");
     }
 
     /**

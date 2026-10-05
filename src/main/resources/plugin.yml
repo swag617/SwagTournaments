@@ -19,7 +19,7 @@ commands:
   tournament:
     description: Player tournament commands
     usage: /<command> [info|top|history|stats|next|profile|halloffame]
-    aliases: [t, tourney]
+    aliases: [t, tourney, ft]
     permission: swagtournaments.use
   tournamentadmin:
     description: Admin tournament commands
